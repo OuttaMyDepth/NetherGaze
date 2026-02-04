@@ -1,0 +1,139 @@
+"""Configuration loading and management."""
+
+from __future__ import annotations
+
+import os
+import tomllib
+from dataclasses import dataclass, field
+from pathlib import Path
+
+
+@dataclass
+class AppConfig:
+    """Application configuration with sensible defaults."""
+
+    # Nginx log path
+    log_path: str = "/var/log/nginx/access.log"
+
+    # Refresh intervals (seconds)
+    connections_interval: float = 1.0
+    log_interval: float = 0.5
+    bandwidth_interval: float = 30.0
+
+    # GeoIP
+    geoip_enabled: bool = True
+    geoip_city_db: str = "/usr/share/GeoIP/GeoLite2-City.mmdb"
+    geoip_asn_db: str = "/usr/share/GeoIP/GeoLite2-ASN.mmdb"
+
+    # Whois
+    whois_enabled: bool = True
+    whois_cache_ttl: int = 86400  # 24 hours
+    whois_max_workers: int = 3
+
+    # Network interface for bandwidth
+    interface: str = "eth0"
+
+    # Display
+    max_log_lines: int = 500
+    max_log_entries_per_ip: int = 100
+    show_private_ips: bool = False
+
+    # Paths
+    cache_dir: str = field(default_factory=lambda: str(Path.home() / ".cache" / "vpstracker"))
+
+    @classmethod
+    def load(
+        cls,
+        config_path: str | None = None,
+        cli_overrides: dict | None = None,
+    ) -> AppConfig:
+        """Load config from TOML file with CLI overrides.
+
+        Resolution order: CLI flag > env var > config file > defaults
+        """
+        config = cls()
+
+        # Try loading from TOML file
+        toml_path = _resolve_config_path(config_path)
+        if toml_path and toml_path.exists():
+            with open(toml_path, "rb") as f:
+                data = tomllib.load(f)
+            _apply_toml(config, data)
+
+        # Apply environment variables
+        _apply_env(config)
+
+        # Apply CLI overrides
+        if cli_overrides:
+            _apply_overrides(config, cli_overrides)
+
+        return config
+
+
+def _resolve_config_path(explicit_path: str | None) -> Path | None:
+    """Resolve config file path."""
+    if explicit_path:
+        return Path(explicit_path)
+    # Check XDG / default locations
+    xdg = os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
+    candidates = [
+        Path(xdg) / "vpstracker" / "config.toml",
+        Path.home() / ".vpstracker.toml",
+    ]
+    for p in candidates:
+        if p.exists():
+            return p
+    return None
+
+
+def _apply_toml(config: AppConfig, data: dict) -> None:
+    """Apply TOML data to config."""
+    section_map = {
+        "log": ["log_path", "max_log_lines", "max_log_entries_per_ip"],
+        "refresh": ["connections_interval", "log_interval", "bandwidth_interval"],
+        "geoip": ["geoip_enabled", "geoip_city_db", "geoip_asn_db"],
+        "whois": ["whois_enabled", "whois_cache_ttl", "whois_max_workers"],
+        "network": ["interface", "show_private_ips"],
+        "display": ["max_log_lines"],
+        "cache": ["cache_dir"],
+    }
+    # Handle flat keys
+    for key in (
+        "log_path",
+        "interface",
+        "show_private_ips",
+    ):
+        if key in data:
+            setattr(config, key, data[key])
+
+    # Handle sectioned keys
+    for section, keys in section_map.items():
+        if section in data:
+            for key in keys:
+                # Map section keys: e.g., geoip.enabled -> geoip_enabled
+                short_key = key.removeprefix(f"{section}_") if key.startswith(f"{section}_") else key
+                if short_key in data[section]:
+                    setattr(config, key, data[section][short_key])
+
+
+def _apply_env(config: AppConfig) -> None:
+    """Apply environment variable overrides (VPSTRACKER_ prefix)."""
+    env_map = {
+        "VPSTRACKER_LOG_PATH": ("log_path", str),
+        "VPSTRACKER_INTERFACE": ("interface", str),
+        "VPSTRACKER_GEOIP_ENABLED": ("geoip_enabled", lambda v: v.lower() in ("1", "true", "yes")),
+        "VPSTRACKER_WHOIS_ENABLED": ("whois_enabled", lambda v: v.lower() in ("1", "true", "yes")),
+        "VPSTRACKER_GEOIP_CITY_DB": ("geoip_city_db", str),
+        "VPSTRACKER_GEOIP_ASN_DB": ("geoip_asn_db", str),
+    }
+    for env_key, (attr, converter) in env_map.items():
+        val = os.environ.get(env_key)
+        if val is not None:
+            setattr(config, attr, converter(val))
+
+
+def _apply_overrides(config: AppConfig, overrides: dict) -> None:
+    """Apply CLI argument overrides."""
+    for key, value in overrides.items():
+        if value is not None and hasattr(config, key):
+            setattr(config, key, value)

@@ -1,0 +1,46 @@
+/* VPSTracker TUI Layout */
+
+Screen {
+    layout: vertical;
+}
+
+#main-panels {
+    height: 1fr;
+}
+
+#main-panels ConnectionsTable {
+    width: 1fr;
+}
+
+#main-panels HttpActivityLog {
+    width: 1fr;
+}
+
+ConnectionsTable DataTable {
+    height: 100%;
+}
+
+HttpActivityLog RichLog {
+    height: 100%;
+    border: solid $surface-lighten-2;
+    border-title-color: $accent;
+}
+
+HeaderBar {
+    dock: top;
+    height: 1;
+    background: $accent;
+    color: $text;
+    text-style: bold;
+}
+
+StatsBar {
+    dock: bottom;
+    height: 1;
+    background: $surface;
+    color: $text-muted;
+}
+
+Footer {
+    dock: bottom;
+}

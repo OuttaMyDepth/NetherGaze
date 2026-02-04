@@ -1,0 +1,40 @@
+# VPSTracker Configuration
+# Copy to ~/.config/vpstracker/config.toml
+
+# Nginx access log path (combined format)
+log_path = "/var/log/nginx/access.log"
+
+# Network interface for bandwidth monitoring
+interface = "eth0"
+
+# Show connections from private/reserved IPs
+show_private_ips = false
+
+[refresh]
+# Refresh intervals in seconds
+connections_interval = 1.0
+log_interval = 0.5
+bandwidth_interval = 30.0
+
+[geoip]
+# MaxMind GeoLite2 database paths
+# Download from: https://dev.maxmind.com/geoip/geolite2-free-geolocation-data
+enabled = true
+city_db = "/usr/share/GeoIP/GeoLite2-City.mmdb"
+asn_db = "/usr/share/GeoIP/GeoLite2-ASN.mmdb"
+
+[whois]
+# RDAP/whois lookups for IP ownership info
+enabled = true
+cache_ttl = 86400       # Cache TTL in seconds (24 hours)
+max_workers = 3         # Max concurrent whois lookups
+
+[log]
+# Maximum log lines to display in the activity panel
+max_log_lines = 500
+# Maximum log entries to keep per IP for drill-down
+max_log_entries_per_ip = 100
+
+[cache]
+# Directory for persistent caches (whois, etc.)
+# cache_dir = "~/.cache/vpstracker"

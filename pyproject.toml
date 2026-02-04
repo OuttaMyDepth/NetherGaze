@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vpstracker"
+version = "0.1.0"
+description = "Real-time VPS network traffic dashboard correlating TCP connections with nginx access logs"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "VPSTracker Contributors" }]
+keywords = ["vps", "monitoring", "tui", "network", "nginx"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Networking :: Monitoring",
+]
+dependencies = [
+    "textual>=0.82.0",
+    "psutil>=5.9.0",
+    "geoip2>=4.8.0",
+    "ipwhois>=1.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+]
+
+[project.scripts]
+vpstracker = "vpstracker.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vpstracker"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
