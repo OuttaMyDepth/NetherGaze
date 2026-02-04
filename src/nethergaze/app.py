@@ -104,10 +104,18 @@ class NethergazeApp(App):
             timeout=5,
         )
 
-    def on_unmount(self) -> None:
+    def _shutdown_services(self) -> None:
+        """Clean up all background services."""
         if self.log_watcher:
             self.log_watcher.close()
         if self.whois:
             self.whois.shutdown()
         if self.geoip:
             self.geoip.close()
+
+    def on_unmount(self) -> None:
+        self._shutdown_services()
+
+    def action_quit(self) -> None:
+        self._shutdown_services()
+        self.exit()

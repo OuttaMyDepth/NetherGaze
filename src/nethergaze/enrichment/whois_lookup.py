@@ -24,6 +24,8 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+
+
 class WhoisLookupService:
     """Threaded whois/RDAP lookup service with TTL cache."""
 
@@ -39,6 +41,11 @@ class WhoisLookupService:
         self._cache_ttl = cache_ttl
         self._cache_dir = Path(cache_dir) if cache_dir else None
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="whois")
+        # Unregister the atexit handler that waits for threads to finish,
+        # so the process can exit even with pending whois lookups.
+        import atexit
+        import concurrent.futures.thread as _tmod
+        atexit.unregister(_tmod._python_exit)
 
         if self._cache_dir:
             self._load_disk_cache()
@@ -188,4 +195,4 @@ class WhoisLookupService:
 
     def shutdown(self) -> None:
         """Shut down the thread pool."""
-        self._executor.shutdown(wait=False)
+        self._executor.shutdown(wait=False, cancel_futures=True)
