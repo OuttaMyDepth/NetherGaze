@@ -1,7 +1,7 @@
-"""Tests for vpstracker.collectors.connections."""
+"""Tests for nethergaze.collectors.connections."""
 
-from vpstracker.collectors.connections import get_connections
-from vpstracker.models import TCPState
+from nethergaze.collectors.connections import get_connections
+from nethergaze.models import TCPState
 
 
 class TestGetConnections:

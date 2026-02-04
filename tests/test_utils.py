@@ -1,6 +1,6 @@
-"""Tests for vpstracker.utils."""
+"""Tests for nethergaze.utils."""
 
-from vpstracker.utils import (
+from nethergaze.utils import (
     format_bytes,
     format_duration,
     is_private_ip,

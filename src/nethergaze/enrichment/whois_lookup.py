@@ -10,8 +10,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Callable
 
-from vpstracker.models import WhoisInfo
-from vpstracker.utils import is_private_ip
+from nethergaze.models import WhoisInfo
+from nethergaze.utils import is_private_ip
 
 try:
     from ipwhois import IPWhois

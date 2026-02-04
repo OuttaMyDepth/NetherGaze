@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from textual.widgets import Static
 
-from vpstracker.models import AggregateStats
-from vpstracker.utils import format_bytes
+from nethergaze.models import AggregateStats
+from nethergaze.utils import format_bytes
 
 
 class StatsBar(Static):

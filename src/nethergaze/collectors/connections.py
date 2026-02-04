@@ -5,8 +5,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from vpstracker.models import Connection, TCPState
-from vpstracker.utils import (
+from nethergaze.models import Connection, TCPState
+from nethergaze.utils import (
     is_private_ip,
     parse_hex_ipv4,
     parse_hex_ipv6,

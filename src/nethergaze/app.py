@@ -1,4 +1,4 @@
-"""VPSTracker Textual application."""
+"""Nethergaze Textual application."""
 
 from __future__ import annotations
 
@@ -6,18 +6,18 @@ from pathlib import Path
 
 from textual.app import App
 
-from vpstracker.collectors.logs import LogWatcher
-from vpstracker.config import AppConfig
-from vpstracker.correlation import CorrelationEngine
-from vpstracker.enrichment.geoip import GeoIPLookup
-from vpstracker.enrichment.whois_lookup import WhoisLookupService
-from vpstracker.screens.dashboard import DashboardScreen
+from nethergaze.collectors.logs import LogWatcher
+from nethergaze.config import AppConfig
+from nethergaze.correlation import CorrelationEngine
+from nethergaze.enrichment.geoip import GeoIPLookup
+from nethergaze.enrichment.whois_lookup import WhoisLookupService
+from nethergaze.screens.dashboard import DashboardScreen
 
 
-class VPSTrackerApp(App):
-    """Main VPSTracker TUI application."""
+class NethergazeApp(App):
+    """Main Nethergaze TUI application."""
 
-    TITLE = "VPSTracker"
+    TITLE = "Nethergaze"
     CSS_PATH = "app.tcss"
 
     BINDINGS = [

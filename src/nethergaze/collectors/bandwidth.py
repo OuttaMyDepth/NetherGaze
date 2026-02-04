@@ -6,7 +6,7 @@ import json
 import shutil
 import subprocess
 
-from vpstracker.models import BandwidthStats
+from nethergaze.models import BandwidthStats
 
 
 def get_bandwidth(interface: str = "eth0") -> BandwidthStats | None:

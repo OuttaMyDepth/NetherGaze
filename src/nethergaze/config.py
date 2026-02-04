@@ -39,7 +39,7 @@ class AppConfig:
     show_private_ips: bool = False
 
     # Paths
-    cache_dir: str = field(default_factory=lambda: str(Path.home() / ".cache" / "vpstracker"))
+    cache_dir: str = field(default_factory=lambda: str(Path.home() / ".cache" / "nethergaze"))
 
     @classmethod
     def load(
@@ -77,8 +77,8 @@ def _resolve_config_path(explicit_path: str | None) -> Path | None:
     # Check XDG / default locations
     xdg = os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
     candidates = [
-        Path(xdg) / "vpstracker" / "config.toml",
-        Path.home() / ".vpstracker.toml",
+        Path(xdg) / "nethergaze" / "config.toml",
+        Path.home() / ".nethergaze.toml",
     ]
     for p in candidates:
         if p.exists():
@@ -117,14 +117,14 @@ def _apply_toml(config: AppConfig, data: dict) -> None:
 
 
 def _apply_env(config: AppConfig) -> None:
-    """Apply environment variable overrides (VPSTRACKER_ prefix)."""
+    """Apply environment variable overrides (NETHERGAZE_ prefix)."""
     env_map = {
-        "VPSTRACKER_LOG_PATH": ("log_path", str),
-        "VPSTRACKER_INTERFACE": ("interface", str),
-        "VPSTRACKER_GEOIP_ENABLED": ("geoip_enabled", lambda v: v.lower() in ("1", "true", "yes")),
-        "VPSTRACKER_WHOIS_ENABLED": ("whois_enabled", lambda v: v.lower() in ("1", "true", "yes")),
-        "VPSTRACKER_GEOIP_CITY_DB": ("geoip_city_db", str),
-        "VPSTRACKER_GEOIP_ASN_DB": ("geoip_asn_db", str),
+        "NETHERGAZE_LOG_PATH": ("log_path", str),
+        "NETHERGAZE_INTERFACE": ("interface", str),
+        "NETHERGAZE_GEOIP_ENABLED": ("geoip_enabled", lambda v: v.lower() in ("1", "true", "yes")),
+        "NETHERGAZE_WHOIS_ENABLED": ("whois_enabled", lambda v: v.lower() in ("1", "true", "yes")),
+        "NETHERGAZE_GEOIP_CITY_DB": ("geoip_city_db", str),
+        "NETHERGAZE_GEOIP_ASN_DB": ("geoip_asn_db", str),
     }
     for env_key, (attr, converter) in env_map.items():
         val = os.environ.get(env_key)

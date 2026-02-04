@@ -7,7 +7,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-from vpstracker.models import LogEntry
+from nethergaze.models import LogEntry
 
 # Nginx combined log format regex
 _LOG_PATTERN = re.compile(

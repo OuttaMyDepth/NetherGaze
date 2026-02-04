@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from vpstracker.models import GeoInfo
-from vpstracker.utils import is_private_ip
+from nethergaze.models import GeoInfo
+from nethergaze.utils import is_private_ip
 
 try:
     import geoip2.database

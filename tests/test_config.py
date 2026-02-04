@@ -1,6 +1,6 @@
-"""Tests for vpstracker.config."""
+"""Tests for nethergaze.config."""
 
-from vpstracker.config import AppConfig
+from nethergaze.config import AppConfig
 
 
 class TestAppConfig:
@@ -34,8 +34,8 @@ class TestAppConfig:
         assert config.log_path == "/var/log/nginx/access.log"
 
     def test_env_override(self, monkeypatch):
-        monkeypatch.setenv("VPSTRACKER_LOG_PATH", "/custom/log")
-        monkeypatch.setenv("VPSTRACKER_INTERFACE", "lo")
+        monkeypatch.setenv("NETHERGAZE_LOG_PATH", "/custom/log")
+        monkeypatch.setenv("NETHERGAZE_INTERFACE", "lo")
         config = AppConfig.load()
         assert config.log_path == "/custom/log"
         assert config.interface == "lo"

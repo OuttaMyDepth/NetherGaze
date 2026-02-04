@@ -6,7 +6,7 @@ from rich.text import Text
 from textual.widgets import RichLog, Static
 from textual.app import ComposeResult
 
-from vpstracker.models import LogEntry
+from nethergaze.models import LogEntry
 
 
 class HttpActivityLog(Static):

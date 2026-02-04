@@ -1,24 +1,24 @@
-"""CLI entry point for VPSTracker."""
+"""CLI entry point for Nethergaze."""
 
 from __future__ import annotations
 
 import argparse
 import sys
 
-from vpstracker import __version__
-from vpstracker.config import AppConfig
+from nethergaze import __version__
+from nethergaze.config import AppConfig
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        prog="vpstracker",
+        prog="nethergaze",
         description="Real-time VPS network traffic dashboard",
     )
     parser.add_argument(
         "--version",
         action="version",
-        version=f"vpstracker {__version__}",
+        version=f"nethergaze {__version__}",
     )
     parser.add_argument(
         "--config",
@@ -73,9 +73,9 @@ def main(argv: list[str] | None = None) -> None:
 
     config = AppConfig.load(config_path=args.config, cli_overrides=overrides)
 
-    from vpstracker.app import VPSTrackerApp
+    from nethergaze.app import NethergazeApp
 
-    app = VPSTrackerApp(config)
+    app = NethergazeApp(config)
     app.run()
 
 

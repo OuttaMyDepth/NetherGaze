@@ -1,5 +1,5 @@
-# VPSTracker Configuration
-# Copy to ~/.config/vpstracker/config.toml
+# Nethergaze Configuration
+# Copy to ~/.config/nethergaze/config.toml
 
 # Nginx access log path (combined format)
 log_path = "/var/log/nginx/access.log"
@@ -37,4 +37,4 @@ max_log_entries_per_ip = 100
 
 [cache]
 # Directory for persistent caches (whois, etc.)
-# cache_dir = "~/.cache/vpstracker"
+# cache_dir = "~/.cache/nethergaze"

@@ -1,6 +1,6 @@
-"""Tests for vpstracker.collectors.logs."""
+"""Tests for nethergaze.collectors.logs."""
 
-from vpstracker.collectors.logs import LogWatcher, parse_log_line
+from nethergaze.collectors.logs import LogWatcher, parse_log_line
 
 
 class TestParseLogLine:

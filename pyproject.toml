@@ -3,12 +3,12 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "vpstracker"
+name = "nethergaze"
 version = "0.1.0"
-description = "Real-time VPS network traffic dashboard correlating TCP connections with nginx access logs"
+description = "Real-time TUI dashboard correlating VPS TCP connections with nginx access logs"
 license = "MIT"
 requires-python = ">=3.11"
-authors = [{ name = "VPSTracker Contributors" }]
+authors = [{ name = "Nethergaze Contributors" }]
 keywords = ["vps", "monitoring", "tui", "network", "nginx"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -34,10 +34,10 @@ dev = [
 ]
 
 [project.scripts]
-vpstracker = "vpstracker.cli:main"
+nethergaze = "nethergaze.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/vpstracker"]
+packages = ["src/nethergaze"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

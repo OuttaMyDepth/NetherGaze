@@ -1,4 +1,4 @@
-/* VPSTracker TUI Layout */
+/* Nethergaze TUI Layout */
 
 Screen {
     layout: vertical;

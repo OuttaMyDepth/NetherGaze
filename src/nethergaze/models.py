@@ -1,4 +1,4 @@
-"""Data models for VPSTracker."""
+"""Data models for Nethergaze."""
 
 from __future__ import annotations
 

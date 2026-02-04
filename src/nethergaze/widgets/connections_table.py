@@ -6,8 +6,8 @@ from textual.app import ComposeResult
 from textual.message import Message
 from textual.widgets import DataTable, Static
 
-from vpstracker.models import IPProfile
-from vpstracker.utils import format_bytes
+from nethergaze.models import IPProfile
+from nethergaze.utils import format_bytes
 
 # Column definitions: (key, label, width)
 COLUMNS = [

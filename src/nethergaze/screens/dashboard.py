@@ -8,18 +8,18 @@ from textual.screen import Screen
 from textual.widgets import Footer
 from textual.worker import Worker, WorkerState
 
-from vpstracker.collectors.bandwidth import get_bandwidth
-from vpstracker.collectors.connections import get_connections
-from vpstracker.collectors.logs import LogWatcher
-from vpstracker.config import AppConfig
-from vpstracker.correlation import CorrelationEngine
-from vpstracker.enrichment.geoip import GeoIPLookup
-from vpstracker.enrichment.whois_lookup import WhoisLookupService
-from vpstracker.utils import is_private_ip
-from vpstracker.widgets.connections_table import ConnectionsTable
-from vpstracker.widgets.header_bar import HeaderBar
-from vpstracker.widgets.http_log import HttpActivityLog
-from vpstracker.widgets.stats_bar import StatsBar
+from nethergaze.collectors.bandwidth import get_bandwidth
+from nethergaze.collectors.connections import get_connections
+from nethergaze.collectors.logs import LogWatcher
+from nethergaze.config import AppConfig
+from nethergaze.correlation import CorrelationEngine
+from nethergaze.enrichment.geoip import GeoIPLookup
+from nethergaze.enrichment.whois_lookup import WhoisLookupService
+from nethergaze.utils import is_private_ip
+from nethergaze.widgets.connections_table import ConnectionsTable
+from nethergaze.widgets.header_bar import HeaderBar
+from nethergaze.widgets.http_log import HttpActivityLog
+from nethergaze.widgets.stats_bar import StatsBar
 
 
 class DashboardScreen(Screen):
@@ -172,7 +172,7 @@ class DashboardScreen(Screen):
 
     def on_connections_table_ip_selected(self, event: ConnectionsTable.IPSelected) -> None:
         """Handle IP selection — open drill-down modal."""
-        from vpstracker.screens.ip_detail import IPDetailScreen
+        from nethergaze.screens.ip_detail import IPDetailScreen
 
         profile = self.engine.get_profile(event.ip)
         if profile:

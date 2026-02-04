@@ -1,9 +1,9 @@
-"""Tests for vpstracker.correlation."""
+"""Tests for nethergaze.correlation."""
 
 from datetime import datetime, timezone
 
-from vpstracker.correlation import CorrelationEngine
-from vpstracker.models import (
+from nethergaze.correlation import CorrelationEngine
+from nethergaze.models import (
     BandwidthStats,
     Connection,
     GeoInfo,

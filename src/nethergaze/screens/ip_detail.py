@@ -8,9 +8,9 @@ from textual.containers import Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, RichLog, Static
 
-from vpstracker.enrichment.whois_lookup import WhoisLookupService
-from vpstracker.models import IPProfile, TCPState
-from vpstracker.utils import format_bytes
+from nethergaze.enrichment.whois_lookup import WhoisLookupService
+from nethergaze.models import IPProfile, TCPState
+from nethergaze.utils import format_bytes
 
 
 class IPDetailScreen(ModalScreen[None]):

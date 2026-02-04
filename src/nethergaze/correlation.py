@@ -6,7 +6,7 @@ import threading
 import time
 from datetime import datetime
 
-from vpstracker.models import (
+from nethergaze.models import (
     AggregateStats,
     BandwidthStats,
     Connection,

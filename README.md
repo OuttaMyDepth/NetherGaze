@@ -11,7 +11,7 @@ Nethergaze is a real-time TUI dashboard that correlates active TCP connections w
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ VPSTracker | vps-2bae6cbe | Up: 47d 3h | BW: ↓12.4 GiB ↑8.2 GiB     │
+│ Nethergaze | vps-2bae6cbe | Up: 47d 3h | BW: ↓12.4 GiB ↑8.2 GiB     │
 ├──────────────────────────────────┬──────────────────────────────────────┤
 │ IP Address     CC Org       Conns│ 14:23:01 93.184.216.34  200 GET /   │
 │ 93.184.216.34  ?  EDGECAST  2   │ 14:23:02 198.51.100.1   404 GET /wp │
@@ -31,7 +31,7 @@ Nethergaze is a real-time TUI dashboard that correlates active TCP connections w
 ## Install
 
 ```bash
-git clone https://github.com/YOURUSER/nethergaze.git
+git clone https://github.com/OuttaMyDepth/NetherGaze.git
 cd nethergaze
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
@@ -41,16 +41,16 @@ pip install -e .
 
 ```bash
 # Basic — reads /var/log/nginx/access.log, monitors eth0
-vpstracker
+nethergaze
 
 # Custom log path and interface
-vpstracker --log-path /var/log/nginx/mysite.log --interface ens3
+nethergaze --log-path /var/log/nginx/mysite.log --interface ens3
 
 # Disable whois lookups (faster startup, less noise)
-vpstracker --no-whois
+nethergaze --no-whois
 
 # Use a config file
-vpstracker --config ~/.config/vpstracker/config.toml
+nethergaze --config ~/.config/nethergaze/config.toml
 ```
 
 ### Key Bindings
@@ -67,7 +67,7 @@ vpstracker --config ~/.config/vpstracker/config.toml
 
 ## Configuration
 
-Copy `config.example.toml` to `~/.config/vpstracker/config.toml`:
+Copy `config.example.toml` to `~/.config/nethergaze/config.toml`:
 
 ```toml
 log_path = "/var/log/nginx/access.log"
@@ -89,7 +89,7 @@ cache_ttl = 86400
 max_workers = 3
 ```
 
-Config resolution: CLI flags → environment variables (`VPSTRACKER_*`) → config file → defaults.
+Config resolution: CLI flags → environment variables (`NETHERGAZE_*`) → config file → defaults.
 
 ## Optional: GeoIP
 

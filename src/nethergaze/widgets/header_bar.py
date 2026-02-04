@@ -8,8 +8,8 @@ from pathlib import Path
 from textual.app import ComposeResult
 from textual.widgets import Static
 
-from vpstracker.models import BandwidthStats
-from vpstracker.utils import format_bytes, format_duration
+from nethergaze.models import BandwidthStats
+from nethergaze.utils import format_bytes, format_duration
 
 
 class HeaderBar(Static):
@@ -41,7 +41,7 @@ class HeaderBar(Static):
         uptime = _get_uptime()
 
         parts = [
-            f" VPSTracker | {hostname}",
+            f" Nethergaze | {hostname}",
             f"Up: {uptime}",
         ]
 
