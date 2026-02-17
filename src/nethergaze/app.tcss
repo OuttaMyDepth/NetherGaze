@@ -41,6 +41,17 @@ StatsBar {
     color: $text-muted;
 }
 
+#filter-input {
+    dock: bottom;
+    display: none;
+    height: 1;
+    margin: 0 1;
+}
+
+#filter-input.visible {
+    display: block;
+}
+
 Footer {
     dock: bottom;
 }

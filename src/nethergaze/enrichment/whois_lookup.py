@@ -104,47 +104,36 @@ class WhoisLookupService:
         ip: str,
         callback: Callable[[str, WhoisInfo], None] | None,
     ) -> None:
-        """Perform RDAP lookup in background thread."""
+        """Perform RDAP lookup with legacy whois fallback in background thread."""
         self._semaphore.acquire()
         try:
             if self._shutting_down:
                 return
             info = WhoisInfo()
             try:
-                obj = IPWhois(ip)
-                result = obj.lookup_rdap(depth=1)
-                info.network_name = result.get("network", {}).get("name", "?") or "?"
-                cidr = result.get("network", {}).get("cidr", "?")
-                info.network_cidr = cidr or "?"
-                info.description = (
-                    result.get("network", {}).get("remarks", [{}])[0].get("description", "")
-                    if result.get("network", {}).get("remarks")
-                    else ""
-                )
-                # Try to extract abuse contact
-                objects = result.get("objects", {})
-                for obj_data in objects.values():
-                    contact = obj_data.get("contact", {})
-                    if contact.get("role") == "abuse" or "abuse" in obj_data.get("handle", "").lower():
-                        for email_entry in contact.get("email", []):
-                            if isinstance(email_entry, dict):
-                                info.abuse_contact = email_entry.get("value", "")
-                            else:
-                                info.abuse_contact = str(email_entry)
-                            if info.abuse_contact:
-                                break
-                    if info.abuse_contact:
-                        break
+                obj = IPWhois(ip, timeout=10)
+                info = self._extract_rdap(obj.lookup_rdap(depth=1))
             except IPDefinedError:
                 info.network_name = "Private/Reserved"
             except Exception as e:
-                logger.debug("Whois lookup failed for %s: %s", ip, e)
+                logger.debug("RDAP failed for %s: %s — trying legacy whois", ip, e)
+                try:
+                    obj = IPWhois(ip, timeout=10)
+                    info = self._extract_legacy(obj.lookup_whois())
+                except IPDefinedError:
+                    info.network_name = "Private/Reserved"
+                except Exception as e2:
+                    logger.debug("Legacy whois also failed for %s: %s", ip, e2)
 
-            with self._lock:
-                self._cache[ip] = (info, time.time())
-                self._pending.discard(ip)
-
-            self._save_to_disk(ip, info)
+            # Only cache if we actually got useful data
+            if info.network_name != "?" or info.network_cidr != "?":
+                with self._lock:
+                    self._cache[ip] = (info, time.time())
+                    self._pending.discard(ip)
+                self._save_to_disk(ip, info)
+            else:
+                with self._lock:
+                    self._pending.discard(ip)
 
             if callback and not self._shutting_down:
                 try:
@@ -153,6 +142,51 @@ class WhoisLookupService:
                     logger.debug("Whois callback failed for %s", ip, exc_info=True)
         finally:
             self._semaphore.release()
+
+    @staticmethod
+    def _extract_rdap(result: dict) -> WhoisInfo:
+        """Extract WhoisInfo from an RDAP result dict."""
+        info = WhoisInfo()
+        info.network_name = result.get("network", {}).get("name", "?") or "?"
+        cidr = result.get("network", {}).get("cidr", "?")
+        info.network_cidr = cidr or "?"
+        info.description = (
+            result.get("network", {}).get("remarks", [{}])[0].get("description", "")
+            if result.get("network", {}).get("remarks")
+            else ""
+        )
+        # Try to extract abuse contact
+        objects = result.get("objects", {})
+        for obj_data in objects.values():
+            contact = obj_data.get("contact", {})
+            if contact.get("role") == "abuse" or "abuse" in obj_data.get("handle", "").lower():
+                for email_entry in contact.get("email", []):
+                    if isinstance(email_entry, dict):
+                        info.abuse_contact = email_entry.get("value", "")
+                    else:
+                        info.abuse_contact = str(email_entry)
+                    if info.abuse_contact:
+                        break
+                if info.abuse_contact:
+                    break
+        return info
+
+    @staticmethod
+    def _extract_legacy(result: dict) -> WhoisInfo:
+        """Extract WhoisInfo from a legacy whois result dict."""
+        info = WhoisInfo()
+        nets = result.get("nets", [])
+        if not nets:
+            return info
+        net = nets[0]
+        info.network_cidr = net.get("cidr") or "?"
+        info.description = net.get("description") or ""
+        # Legacy whois often has name=None; use description as fallback
+        info.network_name = net.get("name") or info.description or "?"
+        abuse = net.get("abuse_emails")
+        if abuse:
+            info.abuse_contact = abuse if isinstance(abuse, str) else abuse[0]
+        return info
 
     def _load_disk_cache(self) -> None:
         """Load cached whois results from disk."""
@@ -173,6 +207,9 @@ class WhoisLookupService:
                         description=entry.get("description", ""),
                         abuse_contact=entry.get("abuse_contact", ""),
                     )
+                    # Skip loading entries that were failed lookups
+                    if info.network_name == "?" and info.network_cidr == "?":
+                        continue
                     self._cache[ip] = (info, ts)
         except (json.JSONDecodeError, KeyError, TypeError):
             pass

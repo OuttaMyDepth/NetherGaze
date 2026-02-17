@@ -87,9 +87,12 @@ class CorrelationEngine:
             self._bandwidth = stats
 
     def get_profiles(self) -> list[IPProfile]:
-        """Get all IP profiles, sorted by active connections (desc)."""
+        """Get IP profiles that have actual activity, sorted by active connections (desc)."""
         with self._lock:
-            profiles = list(self._profiles.values())
+            profiles = [
+                p for p in self._profiles.values()
+                if p.connections or p.total_requests > 0
+            ]
         # Sort: active connections desc, then total requests desc
         profiles.sort(key=lambda p: (p.active_connections, p.total_requests), reverse=True)
         return profiles
@@ -125,13 +128,17 @@ class CorrelationEngine:
             bandwidth=bandwidth,
         )
 
-    def trim_stale_profiles(self, max_age_seconds: int = 300) -> None:
-        """Remove profiles with no connections and no recent log entries."""
+    def trim_stale_profiles(self, max_age_seconds: int = 120) -> None:
+        """Remove profiles with no connections and no recent activity."""
         cutoff = datetime.now().astimezone()
         with self._lock:
             to_remove = []
             for ip, profile in self._profiles.items():
                 if profile.connections:
+                    continue
+                # Immediately drop profiles that never had any real activity
+                if profile.total_requests == 0 and not profile.connections:
+                    to_remove.append(ip)
                     continue
                 if profile.last_seen and (cutoff - profile.last_seen).total_seconds() > max_age_seconds:
                     to_remove.append(ip)

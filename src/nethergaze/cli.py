@@ -28,10 +28,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--log-path",
         metavar="PATH",
-        help="Path to nginx access log (overrides config)",
+        help="Path to HTTP server access log; supports globs (e.g. /var/log/nginx/*.access.log)",
     )
     parser.add_argument(
-        "--refresh-interval",
+        "--log-format",
+        choices=["auto", "combined", "common", "json"],
+        help="Log format: auto, combined, common, or json (default: auto)",
+    )
+    parser.add_argument(
+        "--connections-interval",
         type=float,
         metavar="SECS",
         help="Connection refresh interval in seconds (default: 1.0)",
@@ -62,8 +67,10 @@ def main(argv: list[str] | None = None) -> None:
     overrides: dict = {}
     if args.log_path:
         overrides["log_path"] = args.log_path
-    if args.refresh_interval:
-        overrides["connections_interval"] = args.refresh_interval
+    if args.log_format:
+        overrides["log_format"] = args.log_format
+    if args.connections_interval:
+        overrides["connections_interval"] = args.connections_interval
     if args.interface:
         overrides["interface"] = args.interface
     if args.no_geoip:

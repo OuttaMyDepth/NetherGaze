@@ -5,12 +5,12 @@ from __future__ import annotations
 from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.screen import Screen
-from textual.widgets import Footer
+from textual.widgets import Footer, Input
 from textual.worker import Worker, WorkerState
 
 from nethergaze.collectors.bandwidth import get_bandwidth
 from nethergaze.collectors.connections import get_connections
-from nethergaze.collectors.logs import LogWatcher
+from nethergaze.collectors.logs import LogWatcher, MultiLogWatcher
 from nethergaze.config import AppConfig
 from nethergaze.correlation import CorrelationEngine
 from nethergaze.enrichment.geoip import GeoIPLookup
@@ -31,7 +31,7 @@ class DashboardScreen(Screen):
         engine: CorrelationEngine,
         geoip: GeoIPLookup | None,
         whois: WhoisLookupService | None,
-        log_watcher: LogWatcher | None,
+        log_watcher: LogWatcher | MultiLogWatcher | None,
     ) -> None:
         super().__init__()
         self.config = config
@@ -46,6 +46,7 @@ class DashboardScreen(Screen):
             yield ConnectionsTable()
             yield HttpActivityLog(max_lines=self.config.max_log_lines)
         yield StatsBar()
+        yield Input(id="filter-input", placeholder="Filter log (Enter to apply, Escape to dismiss)")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -61,6 +62,7 @@ class DashboardScreen(Screen):
             self.config.bandwidth_interval,
             self._poll_bandwidth,
         )
+        self.set_interval(60.0, self._trim_stale)
         # Initial bandwidth check
         self._poll_bandwidth()
 
@@ -130,16 +132,22 @@ class DashboardScreen(Screen):
 
         def _work() -> None:
             entries = self.log_watcher.poll()
-            if entries:
-                self.engine.update_log_entries(entries)
-                # Enrich new IPs
-                seen = set()
-                for entry in entries:
-                    if entry.remote_ip not in seen:
-                        seen.add(entry.remote_ip)
-                        self._enrich_ip(entry.remote_ip)
+            if not entries:
+                return
+            # Filter out private/Docker-internal IPs unless configured to show them
+            if not self.config.show_private_ips:
+                entries = [e for e in entries if not is_private_ip(e.remote_ip)]
+            if not entries:
+                return
+            self.engine.update_log_entries(entries)
+            # Enrich new IPs
+            seen = set()
+            for entry in entries:
+                if entry.remote_ip not in seen:
+                    seen.add(entry.remote_ip)
+                    self._enrich_ip(entry.remote_ip)
 
-                self.app.call_from_thread(self._on_new_log_entries, entries)
+            self.app.call_from_thread(self._on_new_log_entries, entries)
 
         self.run_worker(_work, thread=True, exclusive=True, group="logs")
 
@@ -210,7 +218,34 @@ class DashboardScreen(Screen):
             self.whois.lookup(ip, callback=_on_whois)
 
     def action_filter_log(self) -> None:
-        """Prompt for log filter (placeholder — Textual Input not used here)."""
-        # Simple toggle: clear filter if active
-        self._log.set_filter(None)
-        self.notify("Log filter cleared")
+        """Toggle the filter input visibility."""
+        filter_input = self.query_one("#filter-input", Input)
+        if filter_input.has_class("visible"):
+            # Hide and clear filter
+            filter_input.remove_class("visible")
+            filter_input.value = ""
+            self._log.set_filter(None)
+        else:
+            filter_input.add_class("visible")
+            filter_input.focus()
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Apply the filter text when Enter is pressed."""
+        if event.input.id == "filter-input":
+            text = event.value.strip()
+            if text:
+                self._log.set_filter(text)
+            else:
+                self._log.set_filter(None)
+            event.input.remove_class("visible")
+
+    def key_escape(self) -> None:
+        """Dismiss filter input on Escape without applying."""
+        filter_input = self.query_one("#filter-input", Input)
+        if filter_input.has_class("visible"):
+            filter_input.remove_class("visible")
+            filter_input.value = ""
+
+    def _trim_stale(self) -> None:
+        """Remove stale IP profiles to prevent memory leaks."""
+        self.engine.trim_stale_profiles(max_age_seconds=300)

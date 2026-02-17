@@ -29,6 +29,9 @@ env/
 # Cache
 .cache/
 
+# Process / deployment notes
+process.md
+
 # OS
 .DS_Store
 Thumbs.db

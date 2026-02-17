@@ -49,11 +49,8 @@ def _parse_vnstat_json(raw: str) -> BandwidthStats | None:
 
     # Last entry is the current month
     current = months[-1]
-    date_info = current.get("date", {})
 
     return BandwidthStats(
         rx_bytes=current.get("rx", 0),
         tx_bytes=current.get("tx", 0),
-        month=str(date_info.get("month", "")),
-        year=date_info.get("year", 0),
     )

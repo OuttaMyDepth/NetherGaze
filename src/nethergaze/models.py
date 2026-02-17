@@ -43,7 +43,7 @@ class Connection:
 
 @dataclass
 class LogEntry:
-    """A parsed nginx access log entry."""
+    """A parsed HTTP server access log entry."""
 
     remote_ip: str
     timestamp: datetime
@@ -78,7 +78,6 @@ class WhoisInfo:
     network_cidr: str = "?"
     description: str = ""
     abuse_contact: str = ""
-    last_updated: datetime | None = None
 
 
 @dataclass
@@ -122,8 +121,6 @@ class BandwidthStats:
 
     rx_bytes: int = 0
     tx_bytes: int = 0
-    month: str = ""
-    year: int = 0
 
 
 @dataclass

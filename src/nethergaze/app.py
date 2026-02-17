@@ -6,7 +6,7 @@ from pathlib import Path
 
 from textual.app import App
 
-from nethergaze.collectors.logs import LogWatcher
+from nethergaze.collectors.logs import LogWatcher, MultiLogWatcher
 from nethergaze.config import AppConfig
 from nethergaze.correlation import CorrelationEngine
 from nethergaze.enrichment.geoip import GeoIPLookup
@@ -57,13 +57,22 @@ class NethergazeApp(App):
             if not self.whois.available:
                 self.whois = None
 
-        # Initialize log watcher
-        self.log_watcher: LogWatcher | None = None
-        if config.log_path and Path(config.log_path).exists():
-            self.log_watcher = LogWatcher(
-                config.log_path,
-                max_entries_per_ip=config.max_log_entries_per_ip,
-            )
+        # Initialize log watcher (supports glob patterns for multiple files)
+        self.log_watcher: LogWatcher | MultiLogWatcher | None = None
+        if config.log_path:
+            if any(c in config.log_path for c in "*?["):
+                # Glob pattern — watch multiple files
+                self.log_watcher = MultiLogWatcher(
+                    config.log_path,
+                    max_entries_per_ip=config.max_log_entries_per_ip,
+                    log_format=config.log_format,
+                )
+            elif Path(config.log_path).exists():
+                self.log_watcher = LogWatcher(
+                    config.log_path,
+                    max_entries_per_ip=config.max_log_entries_per_ip,
+                    log_format=config.log_format,
+                )
 
     def on_mount(self) -> None:
         self.push_screen(

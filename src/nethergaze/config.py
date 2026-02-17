@@ -12,8 +12,9 @@ from pathlib import Path
 class AppConfig:
     """Application configuration with sensible defaults."""
 
-    # Nginx log path
-    log_path: str = "/var/log/nginx/access.log"
+    # HTTP server access log path (supports glob patterns, e.g. /var/log/nginx/*.access.log)
+    log_path: str = "/var/log/nginx/*.access.log"
+    log_format: str = "auto"
 
     # Refresh intervals (seconds)
     connections_interval: float = 1.0
@@ -89,17 +90,16 @@ def _resolve_config_path(explicit_path: str | None) -> Path | None:
 def _apply_toml(config: AppConfig, data: dict) -> None:
     """Apply TOML data to config."""
     section_map = {
-        "log": ["log_path", "max_log_lines", "max_log_entries_per_ip"],
+        "log": ["log_path", "log_format", "max_log_lines", "max_log_entries_per_ip"],
         "refresh": ["connections_interval", "log_interval", "bandwidth_interval"],
         "geoip": ["geoip_enabled", "geoip_city_db", "geoip_asn_db"],
         "whois": ["whois_enabled", "whois_cache_ttl", "whois_max_workers"],
-        "network": ["interface", "show_private_ips"],
-        "display": ["max_log_lines"],
         "cache": ["cache_dir"],
     }
     # Handle flat keys
     for key in (
         "log_path",
+        "log_format",
         "interface",
         "show_private_ips",
     ):
@@ -120,6 +120,7 @@ def _apply_env(config: AppConfig) -> None:
     """Apply environment variable overrides (NETHERGAZE_ prefix)."""
     env_map = {
         "NETHERGAZE_LOG_PATH": ("log_path", str),
+        "NETHERGAZE_LOG_FORMAT": ("log_format", str),
         "NETHERGAZE_INTERFACE": ("interface", str),
         "NETHERGAZE_GEOIP_ENABLED": ("geoip_enabled", lambda v: v.lower() in ("1", "true", "yes")),
         "NETHERGAZE_WHOIS_ENABLED": ("whois_enabled", lambda v: v.lower() in ("1", "true", "yes")),

@@ -1,8 +1,12 @@
 # Nethergaze Configuration
 # Copy to ~/.config/nethergaze/config.toml
 
-# Nginx access log path (combined format)
-log_path = "/var/log/nginx/access.log"
+# HTTP server access log path (supports glob patterns for multiple vhosts)
+log_path = "/var/log/nginx/*.access.log"
+
+# Log format: auto, combined, common, json (default: auto)
+# auto detects the format automatically per line
+# log_format = "auto"
 
 # Network interface for bandwidth monitoring
 interface = "eth0"
@@ -34,6 +38,8 @@ max_workers = 3         # Max concurrent whois lookups
 max_log_lines = 500
 # Maximum log entries to keep per IP for drill-down
 max_log_entries_per_ip = 100
+# Log format (can also be set as flat key above)
+# format = "auto"
 
 [cache]
 # Directory for persistent caches (whois, etc.)

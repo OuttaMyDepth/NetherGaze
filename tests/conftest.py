@@ -39,7 +39,7 @@ def tmp_proc(tmp_path):
 
 @pytest.fixture
 def sample_log_lines():
-    """Sample nginx combined format log lines."""
+    """Sample HTTP server combined format log lines."""
     return [
         '93.184.216.34 - - [01/Jan/2025:12:00:00 +0000] "GET /index.html HTTP/1.1" 200 1234 "-" "Mozilla/5.0"',
         '93.184.216.34 - - [01/Jan/2025:12:00:01 +0000] "POST /api/data HTTP/1.1" 201 567 "https://example.com" "curl/7.68.0"',
