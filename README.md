@@ -9,19 +9,7 @@ Nethergaze is a real-time TUI dashboard that correlates active TCP connections w
 
 ## What It Does
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│ Nethergaze | vps-2bae6cbe | Up: 47d 3h | BW: ↓12.4 GiB ↑8.2 GiB     │
-├──────────────────────────────────┬──────────────────────────────────────┤
-│ IP Address     CC Org       Conns│ 14:23:01 93.184.216.34  200 GET /   │
-│ 93.184.216.34  US EDGECAST  2   │ 14:23:02 198.51.100.1   404 GET /wp │
-│ 198.51.100.1   DE CLOUDFLAR 1   │ 14:23:03 203.0.113.50   200 POST /a │
-│ 203.0.113.50   FI HETZNER   3   │ 14:23:04 93.184.216.34  200 GET /st │
-│                                  │ 14:23:05 170.106.107.87 403 GET /.. │
-├──────────────────────────────────┴──────────────────────────────────────┤
-│ Conns: 14 (6 EST) | IPs: 4 | Req/min: 23 | Sent: 4.2 MiB             │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+![Nethergaze in action — catching a SYN flood botnet](public/nethergaze.png)
 
 - **Left panel** — Sortable table of connected IPs with country, org name (GeoIP + whois), connection count, request count, bytes served
 - **Right panel** — Color-coded streaming HTTP log (green=2xx, yellow=4xx, red=5xx) with live filtering
