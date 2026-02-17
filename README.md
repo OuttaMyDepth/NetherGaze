@@ -9,8 +9,8 @@ Live correlate TCP connection state with HTTP requests and enrich suspicious IPs
 
 ![Nethergaze dashboard — live traffic correlation](public/bot.png)
 
-- **Left panel** — Sortable table of connected IPs with country, org (GeoIP + whois), connection count, requests, bytes
-- **Right panel** — Color-coded streaming HTTP log (green=2xx, yellow=4xx, red=5xx) with live filtering
+> **What you're seeing:** The left panel correlates each IP's TCP connections with its HTTP requests — country, org, connection count, and bytes all in one view. The right panel streams color-coded access log entries in real time. The top bar surfaces the highest-traffic IPs at a glance. An IP with 10 connections but zero requests? That's suspicious. An IP hammering `/wp-login.php` at 200 req/min? You'll see it instantly.
+
 - **Top offenders bar** — Real-time req/s, new connections/s, and top 3 IPs by request rate and connection count
 - **IP drill-down** — Press Enter on any IP for full detail: connections, recent requests, whois info
 - **Suspicious mode** — One-key toggle to surface SYN floods, scanners, and burst traffic
@@ -26,19 +26,47 @@ Pressing `!` to toggle suspicious mode instantly filtered the view down to only 
 
 ![Suspicious mode — filtering to botnet traffic only](public/susmode.png)
 
+> **What you're seeing:** Suspicious mode (`!`) filtered the table to only anomalous IPs. Every row is BR / 67 TELECOM with 10+ connections, zero requests, zero bytes — a textbook SYN flood. The top bar confirms the pattern: `TopConn` shows the worst offenders. From here, `b` generates a firewall block command and `c` copies the IP.
+
 `ss` shows connections but not what they're requesting. Access logs show requests but not TCP state. Nethergaze joins them by IP in real time so anomalies — botnets, scanners, misbehaving clients — stand out at a glance.
+
+## How It Works
+
+**The problem:** Your existing tools show slices of the picture. `ss` gives you TCP state but not what IPs are requesting. Access logs show HTTP requests but not the underlying connections. When a botnet opens 200 half-open connections and never sends a request, your access logs are silent.
+
+**The solution:** Nethergaze reads all the data sources in parallel and joins them by IP address in a thread-safe correlation engine:
+
+```
+/proc/net/tcp (1s poll) -->                  --> Connections Table
+HTTP access logs (0.5s) --> Correlation      --> HTTP Activity Log
+vnstat (30s)            -->   Engine         --> Top Offenders Bar
+whois/RDAP (async)      --> (IPProfile dict) --> Header / Stats Bar
+GeoIP (sync, cached)    -->                  --> Filter Engine
+```
+
+**What makes it fast:** Nethergaze runs on the same box it monitors without adding load.
+
+- **Connections** — Reads `/proc/net/tcp` directly (no subprocess). Faster than shelling out to `ss` or `netstat`.
+- **Log tailing** — Inode-based rotation detection, seek-to-end on first open (only tails new lines, never replays the full file). Glob patterns tail all vhost logs simultaneously.
+- **GeoIP** — Sync lookups against local MMDB files, memory-cached. No network calls. ~0.1ms per lookup.
+- **Whois/RDAP** — Async in a capped thread pool (3 workers). RDAP first, legacy whois fallback, 10s timeouts, disk-cached 24h. Failed lookups retry on next encounter.
+- **Per-IP rate tracking** — Rolling 60-second window powers filters, suspicious mode, and the top offenders bar.
+- **Enrichment off** — `--no-whois --no-geoip` disables all outbound calls for high-traffic environments.
+
+No telemetry, no analytics, no phoning home. The only outbound calls are whois/RDAP lookups for IP enrichment, and those are opt-out with `--no-whois`.
 
 ## Install
 
 ```bash
-# From PyPI (when published)
-pipx install nethergaze
+pipx install git+https://github.com/OuttaMyDepth/NetherGaze.git
+```
 
-# From source
+That's it — no clone, no venv. To hack on it:
+
+```bash
 git clone https://github.com/OuttaMyDepth/NetherGaze.git
-cd nethergaze
-pipx install .        # isolated install, or:
-pip install -e .      # editable dev install in a venv
+cd NetherGaze
+pip install -e .
 ```
 
 ### GeoIP Databases (Recommended)
@@ -158,19 +186,7 @@ enable_block_execution = false  # Allow executing block commands (requires sudo)
 
 Resolution order: CLI flags > environment variables (`NETHERGAZE_*`) > config file > defaults.
 
-## Performance
-
-Nethergaze is designed to run on the same box it monitors without adding load:
-
-- **GeoIP** — Sync lookups against local MMDB files, results memory-cached for the session. No network calls. ~0.1ms per lookup.
-- **Whois/RDAP** — Async in a capped thread pool (default: 3 workers). RDAP tried first; on failure (e.g., LACNIC 403), falls back to legacy whois with 10-second timeout. Results disk-cached for 24 hours at `~/.cache/nethergaze/whois_cache.json`. Failed lookups are not cached and retry on next encounter.
-- **Connections** — Reads `/proc/net/tcp` directly (no subprocess). Faster than shelling out to `ss` or `netstat`.
-- **Log tailing** — Inode-based rotation detection, seek-to-end on first open (only tails new lines, never replays the full file).
-- **Enrichment off** — `--no-whois --no-geoip` disables all outbound calls for high-traffic environments where you only need the correlation.
-
 ### Privacy / Outbound Calls
-
-Nethergaze makes outbound network requests only for IP enrichment:
 
 | Data sent | Destination | Protocol | Opt-out |
 |-----------|-------------|----------|---------|
@@ -178,27 +194,7 @@ Nethergaze makes outbound network requests only for IP enrichment:
 | Remote IP address | Legacy whois servers (port 43) | TCP | `--no-whois` |
 | None (local file reads) | GeoIP MMDB on disk | N/A | `--no-geoip` |
 
-No telemetry, no analytics, no phoning home. Whois cache is stored locally at `~/.cache/nethergaze/whois_cache.json`. GeoIP results are memory-only (not persisted).
-
-## Architecture
-
-```
-/proc/net/tcp (1s poll) -->                  --> Connections Table
-HTTP access logs (0.5s) --> Correlation      --> HTTP Activity Log
-vnstat (30s)            -->   Engine         --> Top Offenders Bar
-whois/RDAP (async)      --> (IPProfile dict) --> Header / Stats Bar
-GeoIP (sync, cached)    -->                  --> Filter Engine
-```
-
-Key implementation details:
-
-- **Multi-file log watching** — `log_path` accepts glob patterns (e.g., `/var/log/nginx/*.access.log`) to tail all vhost logs simultaneously, with periodic rescan for new files
-- **Private IP filtering** — Docker bridge / internal traffic (172.x, 10.x, etc.) is filtered from display by default
-- **Whois resilience** — RDAP first, legacy whois fallback, 10s timeouts, proper socket cleanup to prevent CLOSE-WAIT leaks
-- **Stale profile cleanup** — IPs with no connections and no request history are auto-pruned from display
-- **Composable filters** — `FilterState` applies AND-composed predicates at the view layer; the correlation engine stays unfiltered as source of truth
-- **Suspicious mode** — OR-composed heuristics: SYN_RECV + no requests, high connections + low requests, burst req/min, known scanner user-agents (zgrab, masscan, nmap, nuclei, etc.)
-- **Per-IP rate tracking** — Rolling 60-second window of per-IP request timestamps, used by filters, suspicious mode, and the top offenders bar
+Whois cache is stored locally at `~/.cache/nethergaze/whois_cache.json`. GeoIP results are memory-only (not persisted).
 
 ## Requirements
 
