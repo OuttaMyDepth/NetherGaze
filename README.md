@@ -3,7 +3,10 @@
 Live correlate TCP connection state with HTTP requests and enrich suspicious IPs — in a terminal dashboard.
 
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
+![Linux](https://img.shields.io/badge/platform-linux-yellow)
+![Textual TUI](https://img.shields.io/badge/TUI-textual-purple)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
+![GitHub last commit](https://img.shields.io/github/last-commit/OuttaMyDepth/NetherGaze)
 
 *Not a replacement for ELK or Grafana. It's a **live triage console** — competes with your own shell muscle memory, not big observability stacks.*
 
