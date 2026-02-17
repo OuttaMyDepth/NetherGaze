@@ -112,14 +112,20 @@ class WhoisLookupService:
             info = WhoisInfo()
             try:
                 obj = IPWhois(ip, timeout=10)
-                info = self._extract_rdap(obj.lookup_rdap(depth=1))
+                try:
+                    info = self._extract_rdap(obj.lookup_rdap(depth=1))
+                finally:
+                    self._close_ipwhois(obj)
             except IPDefinedError:
                 info.network_name = "Private/Reserved"
             except Exception as e:
                 logger.debug("RDAP failed for %s: %s — trying legacy whois", ip, e)
                 try:
                     obj = IPWhois(ip, timeout=10)
-                    info = self._extract_legacy(obj.lookup_whois())
+                    try:
+                        info = self._extract_legacy(obj.lookup_whois())
+                    finally:
+                        self._close_ipwhois(obj)
                 except IPDefinedError:
                     info.network_name = "Private/Reserved"
                 except Exception as e2:
@@ -142,6 +148,16 @@ class WhoisLookupService:
                     logger.debug("Whois callback failed for %s", ip, exc_info=True)
         finally:
             self._semaphore.release()
+
+    @staticmethod
+    def _close_ipwhois(obj) -> None:
+        """Close the urllib opener to prevent CLOSE-WAIT socket leaks."""
+        try:
+            opener = getattr(obj.net, "opener", None)
+            if opener:
+                opener.close()
+        except Exception:
+            pass
 
     @staticmethod
     def _extract_rdap(result: dict) -> WhoisInfo:
