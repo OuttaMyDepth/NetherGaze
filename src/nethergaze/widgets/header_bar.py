@@ -13,7 +13,7 @@ from nethergaze.utils import format_bytes, format_duration
 
 
 class HeaderBar(Static):
-    """Top bar: hostname, uptime, and monthly bandwidth."""
+    """Top bar: hostname, uptime, monthly bandwidth, and mode indicators."""
 
     DEFAULT_CSS = """
     HeaderBar {
@@ -28,6 +28,7 @@ class HeaderBar(Static):
     def __init__(self) -> None:
         super().__init__()
         self._bandwidth: BandwidthStats | None = None
+        self._suspicious: bool = False
 
     def on_mount(self) -> None:
         self._refresh_display()
@@ -35,6 +36,11 @@ class HeaderBar(Static):
     def update_bandwidth(self, stats: BandwidthStats | None) -> None:
         self._bandwidth = stats
         self._refresh_display()
+
+    def set_suspicious_mode(self, active: bool) -> None:
+        if self._suspicious != active:
+            self._suspicious = active
+            self._refresh_display()
 
     def _refresh_display(self) -> None:
         hostname = platform.node() or "unknown"
@@ -48,9 +54,12 @@ class HeaderBar(Static):
         if self._bandwidth:
             rx = format_bytes(self._bandwidth.rx_bytes)
             tx = format_bytes(self._bandwidth.tx_bytes)
-            parts.append(f"BW: ↓{rx} ↑{tx}")
+            parts.append(f"BW: \u2193{rx} \u2191{tx}")
         else:
             parts.append("BW: N/A")
+
+        if self._suspicious:
+            parts.append("[SUSPICIOUS]")
 
         self.update(" | ".join(parts) + " ")
 

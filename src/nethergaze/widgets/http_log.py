@@ -10,7 +10,11 @@ from nethergaze.models import LogEntry
 
 
 class HttpActivityLog(Static):
-    """Streaming HTTP log with color-coded status codes."""
+    """Streaming HTTP log with color-coded status codes.
+
+    Filtering is handled at the dashboard level via FilterState.
+    This widget simply renders whatever entries it receives.
+    """
 
     DEFAULT_CSS = """
     HttpActivityLog {
@@ -25,7 +29,6 @@ class HttpActivityLog(Static):
     def __init__(self, max_lines: int = 500) -> None:
         super().__init__()
         self._max_lines = max_lines
-        self._filter: str | None = None
 
     def compose(self) -> ComposeResult:
         yield RichLog(id="http-log", max_lines=self._max_lines, wrap=False, markup=False)
@@ -34,13 +37,7 @@ class HttpActivityLog(Static):
         """Add new log entries to the log display."""
         log = self.query_one(RichLog)
         for entry in entries:
-            if self._filter and self._filter not in _entry_text(entry):
-                continue
             log.write(_format_entry(entry))
-
-    def set_filter(self, text: str | None) -> None:
-        """Set or clear the log filter."""
-        self._filter = text.lower() if text else None
 
     def clear_log(self) -> None:
         """Clear the log display."""
@@ -67,8 +64,3 @@ def _format_entry(entry: LogEntry) -> Text:
     text.append(f"{entry.method:6s} ", style="bold")
     text.append(entry.path)
     return text
-
-
-def _entry_text(entry: LogEntry) -> str:
-    """Plain text for filtering."""
-    return f"{entry.remote_ip} {entry.status_code} {entry.method} {entry.path}".lower()

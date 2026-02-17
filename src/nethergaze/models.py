@@ -93,6 +93,7 @@ class IPProfile:
     last_seen: datetime | None = None
     total_bytes_sent: int = 0
     total_requests: int = 0
+    request_rate_per_min: float = 0.0
 
     @property
     def active_connections(self) -> int:
@@ -113,6 +114,25 @@ class IPProfile:
         if self.whois and self.whois.network_name != "?":
             return self.whois.network_name
         return "?"
+
+
+@dataclass
+class OffenderSummary:
+    """Top offender metrics for the summary bar."""
+
+    req_per_sec: float = 0.0
+    new_conns_per_sec: float = 0.0
+    top_by_requests: list[tuple[str, float]] = field(default_factory=list)
+    top_by_conns: list[tuple[str, int]] = field(default_factory=list)
+
+
+@dataclass
+class ActionHook:
+    """User-defined action triggered by a keybind on the selected IP."""
+
+    key: str
+    label: str
+    command: str  # {ip} placeholder
 
 
 @dataclass

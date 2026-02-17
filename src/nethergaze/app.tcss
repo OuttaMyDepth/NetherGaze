@@ -34,6 +34,13 @@ HeaderBar {
     text-style: bold;
 }
 
+OffendersBar {
+    dock: top;
+    height: 1;
+    background: $error-darken-3;
+    color: $text;
+}
+
 StatsBar {
     dock: bottom;
     height: 1;

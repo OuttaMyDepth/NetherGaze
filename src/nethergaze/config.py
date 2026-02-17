@@ -39,6 +39,17 @@ class AppConfig:
     max_log_entries_per_ip: int = 100
     show_private_ips: bool = False
 
+    # Filters
+    cidr_allow: list[str] = field(default_factory=list)
+    cidr_deny: list[str] = field(default_factory=list)
+    suspicious_burst_rpm: float = 60.0
+    suspicious_min_conns: int = 5
+    scanner_user_agents: list[str] = field(default_factory=list)
+
+    # Actions
+    enable_block_execution: bool = False
+    action_hooks: list[dict] = field(default_factory=list)
+
     # Paths
     cache_dir: str = field(default_factory=lambda: str(Path.home() / ".cache" / "nethergaze"))
 
@@ -96,6 +107,25 @@ def _apply_toml(config: AppConfig, data: dict) -> None:
         "whois": ["whois_enabled", "whois_cache_ttl", "whois_max_workers"],
         "cache": ["cache_dir"],
     }
+
+    # Handle [filters] section
+    if "filters" in data:
+        filt = data["filters"]
+        for key in ("cidr_allow", "cidr_deny", "scanner_user_agents"):
+            if key in filt:
+                setattr(config, key, filt[key])
+        if "suspicious_burst_rpm" in filt:
+            config.suspicious_burst_rpm = float(filt["suspicious_burst_rpm"])
+        if "suspicious_min_conns" in filt:
+            config.suspicious_min_conns = int(filt["suspicious_min_conns"])
+
+    # Handle [actions] section
+    if "actions" in data:
+        act = data["actions"]
+        if "enable_block_execution" in act:
+            config.enable_block_execution = bool(act["enable_block_execution"])
+        if "hooks" in act:
+            config.action_hooks = act["hooks"]
     # Handle flat keys
     for key in (
         "log_path",

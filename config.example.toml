@@ -44,3 +44,30 @@ max_log_entries_per_ip = 100
 [cache]
 # Directory for persistent caches (whois, etc.)
 # cache_dir = "~/.cache/nethergaze"
+
+[filters]
+# CIDR allow/deny lists (IPs outside allow or inside deny are hidden)
+# cidr_allow = []
+# cidr_deny = ["10.0.0.0/8"]
+
+# Suspicious mode thresholds (toggled with '!')
+suspicious_burst_rpm = 60        # Requests/min to flag as burst
+suspicious_min_conns = 5         # Min connections for "high conns + low reqs" pattern
+
+# Extra scanner user-agent patterns (added to built-in list)
+# scanner_user_agents = ["custom-bot"]
+
+[actions]
+# Allow executing block commands from the TUI (requires sudo)
+enable_block_execution = false
+
+# Custom action hooks triggered on selected IP
+# [[actions.hooks]]
+# key = "1"
+# label = "Reverse DNS"
+# command = "dig -x {ip}"
+#
+# [[actions.hooks]]
+# key = "2"
+# label = "Ping"
+# command = "ping -c 3 {ip}"

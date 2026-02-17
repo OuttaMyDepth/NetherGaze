@@ -22,13 +22,17 @@ class NethergazeApp(App):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("tab", "focus_next", "Next Panel"),
-        ("shift+tab", "focus_previous", "Prev Panel"),
+        ("tab", "focus_next", "Next"),
+        ("shift+tab", "focus_previous", "Prev"),
         ("enter", "select", "Select"),
         ("s", "cycle_sort", "Sort"),
         ("w", "whois_selected", "Whois"),
         ("r", "refresh", "Refresh"),
         ("slash", "filter_log", "Filter"),
+        ("f", "open_filters", "Filters"),
+        ("exclamation_mark", "toggle_suspicious", "Sus"),
+        ("c", "copy_ip", "Copy IP"),
+        ("b", "suggest_block", "Block"),
         ("question_mark", "help", "Help"),
     ]
 
@@ -36,17 +40,14 @@ class NethergazeApp(App):
         super().__init__()
         self.config = config
 
-        # Initialize correlation engine
         self.engine = CorrelationEngine()
 
-        # Initialize GeoIP
         self.geoip: GeoIPLookup | None = None
         if config.geoip_enabled:
             self.geoip = GeoIPLookup(config.geoip_city_db, config.geoip_asn_db)
             if not self.geoip.available:
                 self.geoip = None
 
-        # Initialize whois service
         self.whois: WhoisLookupService | None = None
         if config.whois_enabled:
             self.whois = WhoisLookupService(
@@ -57,11 +58,9 @@ class NethergazeApp(App):
             if not self.whois.available:
                 self.whois = None
 
-        # Initialize log watcher (supports glob patterns for multiple files)
         self.log_watcher: LogWatcher | MultiLogWatcher | None = None
         if config.log_path:
             if any(c in config.log_path for c in "*?["):
-                # Glob pattern — watch multiple files
                 self.log_watcher = MultiLogWatcher(
                     config.log_path,
                     max_entries_per_ip=config.max_log_entries_per_ip,
@@ -85,36 +84,46 @@ class NethergazeApp(App):
             )
         )
 
-    def action_cycle_sort(self) -> None:
+    def _delegate(self, action: str) -> None:
+        """Delegate an action to the current screen if it supports it."""
         screen = self.screen
-        if hasattr(screen, "action_cycle_sort"):
-            screen.action_cycle_sort()
+        method = getattr(screen, action, None)
+        if method:
+            method()
+
+    def action_cycle_sort(self) -> None:
+        self._delegate("action_cycle_sort")
 
     def action_whois_selected(self) -> None:
-        screen = self.screen
-        if hasattr(screen, "action_whois_selected"):
-            screen.action_whois_selected()
+        self._delegate("action_whois_selected")
 
     def action_refresh(self) -> None:
-        screen = self.screen
-        if hasattr(screen, "action_refresh"):
-            screen.action_refresh()
+        self._delegate("action_refresh")
 
     def action_filter_log(self) -> None:
-        screen = self.screen
-        if hasattr(screen, "action_filter_log"):
-            screen.action_filter_log()
+        self._delegate("action_filter_log")
+
+    def action_open_filters(self) -> None:
+        self._delegate("action_open_filters")
+
+    def action_toggle_suspicious(self) -> None:
+        self._delegate("action_toggle_suspicious")
+
+    def action_copy_ip(self) -> None:
+        self._delegate("action_copy_ip")
+
+    def action_suggest_block(self) -> None:
+        self._delegate("action_suggest_block")
 
     def action_help(self) -> None:
         self.notify(
-            "q:Quit  Tab:Focus  Enter:Detail  s:Sort  "
-            "w:Whois  r:Refresh  /:Filter  ?:Help",
+            "q:Quit  Tab:Focus  Enter:Detail  s:Sort  w:Whois  r:Refresh\n"
+            "/:Text filter  f:Filters  !:Suspicious  c:Copy IP  b:Block  ?:Help",
             title="Key Bindings",
             timeout=5,
         )
 
     def _shutdown_services(self) -> None:
-        """Clean up all background services."""
         if self.log_watcher:
             self.log_watcher.close()
         if self.whois:

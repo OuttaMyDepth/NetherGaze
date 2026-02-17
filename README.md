@@ -7,16 +7,24 @@ Live correlate TCP connection state with HTTP requests and enrich suspicious IPs
 
 *Not a replacement for ELK or Grafana. It's a **live triage console** — competes with your own shell muscle memory, not big observability stacks.*
 
-![Nethergaze in action — catching a SYN flood botnet](public/nethergaze.png)
+![Nethergaze dashboard — live traffic correlation](public/bot.png)
 
 - **Left panel** — Sortable table of connected IPs with country, org (GeoIP + whois), connection count, requests, bytes
 - **Right panel** — Color-coded streaming HTTP log (green=2xx, yellow=4xx, red=5xx) with live filtering
+- **Top offenders bar** — Real-time req/s, new connections/s, and top 3 IPs by request rate and connection count
 - **IP drill-down** — Press Enter on any IP for full detail: connections, recent requests, whois info
+- **Suspicious mode** — One-key toggle to surface SYN floods, scanners, and burst traffic
+- **Structured filters** — Filter by TCP state, status codes, request rate, CIDR ranges, or free text — applied to both panels
+- **Block assist** — Auto-detect your firewall (ufw/nft/iptables) and generate or execute block commands from the TUI
 - **Auto-enrichment** — GeoIP and whois/RDAP lookups run in background threads for every new IP
 
 ## Why It Matters
 
 During initial deployment, Nethergaze revealed a **SYN flood attack** — 254 half-open connections from a Brazilian botnet (~30 IPs across two /24 blocks) hammering port 443. The connections showed up in the table with country/org data but zero completed requests, which made the pattern immediately obvious. Without this kind of correlation between TCP state and HTTP logs, the attack would have gone unnoticed until performance degraded.
+
+Pressing `!` to toggle suspicious mode instantly filtered the view down to only the attacking IPs. Pressing `b` generated a `sudo ufw insert 1 deny from ...` command ready to copy and run.
+
+![Suspicious mode — filtering to botnet traffic only](public/susmode.png)
 
 `ss` shows connections but not what they're requesting. Access logs show requests but not TCP state. Nethergaze joins them by IP in real time so anomalies — botnets, scanners, misbehaving clients — stand out at a glance.
 
@@ -97,7 +105,11 @@ Auto-detected per line. Override with `--log-format` if needed:
 | `s` | Cycle sort column (connections / requests / bytes / IP) |
 | `w` | Trigger whois lookup for selected IP |
 | `r` | Force refresh all data |
-| `/` | Filter log entries (Enter to apply, Escape to dismiss) |
+| `/` | Quick text filter (Enter to apply, Escape to dismiss) |
+| `f` | Open structured filter modal (TCP state, status codes, request rate) |
+| `!` | Toggle suspicious mode — surface SYN floods, scanners, burst traffic |
+| `c` | Copy selected IP to clipboard |
+| `b` | Show block command for selected IP (auto-detects ufw/nft/iptables) |
 | `?` | Show key bindings |
 
 ## Configuration
@@ -126,6 +138,22 @@ asn_db = "/usr/share/GeoIP/GeoLite2-ASN.mmdb"
 enabled = true
 cache_ttl = 86400   # 24-hour disk cache
 max_workers = 3     # Max concurrent lookups
+
+[filters]
+# CIDR allow/deny lists (IPs outside allow or inside deny are hidden)
+# cidr_allow = []
+# cidr_deny = ["10.0.0.0/8"]
+suspicious_burst_rpm = 60      # Req/min threshold for burst detection
+suspicious_min_conns = 5       # Min connections for "high conns + low reqs" pattern
+# scanner_user_agents = ["custom-bot"]   # Extra scanner UA patterns
+
+[actions]
+enable_block_execution = false  # Allow executing block commands (requires sudo)
+# Custom action hooks:
+# [[actions.hooks]]
+# key = "1"
+# label = "Reverse DNS"
+# command = "dig -x {ip}"
 ```
 
 Resolution order: CLI flags > environment variables (`NETHERGAZE_*`) > config file > defaults.
@@ -157,9 +185,9 @@ No telemetry, no analytics, no phoning home. Whois cache is stored locally at `~
 ```
 /proc/net/tcp (1s poll) -->                  --> Connections Table
 HTTP access logs (0.5s) --> Correlation      --> HTTP Activity Log
-vnstat (30s)            -->   Engine         --> Header Bar
-whois/RDAP (async)      --> (IPProfile dict) --> Stats Bar
-GeoIP (sync, cached)    -->
+vnstat (30s)            -->   Engine         --> Top Offenders Bar
+whois/RDAP (async)      --> (IPProfile dict) --> Header / Stats Bar
+GeoIP (sync, cached)    -->                  --> Filter Engine
 ```
 
 Key implementation details:
@@ -168,6 +196,9 @@ Key implementation details:
 - **Private IP filtering** — Docker bridge / internal traffic (172.x, 10.x, etc.) is filtered from display by default
 - **Whois resilience** — RDAP first, legacy whois fallback, 10s timeouts, proper socket cleanup to prevent CLOSE-WAIT leaks
 - **Stale profile cleanup** — IPs with no connections and no request history are auto-pruned from display
+- **Composable filters** — `FilterState` applies AND-composed predicates at the view layer; the correlation engine stays unfiltered as source of truth
+- **Suspicious mode** — OR-composed heuristics: SYN_RECV + no requests, high connections + low requests, burst req/min, known scanner user-agents (zgrab, masscan, nmap, nuclei, etc.)
+- **Per-IP rate tracking** — Rolling 60-second window of per-IP request timestamps, used by filters, suspicious mode, and the top offenders bar
 
 ## Requirements
 
