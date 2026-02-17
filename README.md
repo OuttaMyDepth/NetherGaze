@@ -1,6 +1,6 @@
 # Nethergaze
 
-Live correlate TCP connection state with HTTP requests and enrich suspicious IPs — in a terminal dashboard.
+Live correlate TCP connection state with HTTP requests and enrich suspicious IPs all in a terminal dashboard.
 
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Linux](https://img.shields.io/badge/platform-linux-yellow)
@@ -8,30 +8,30 @@ Live correlate TCP connection state with HTTP requests and enrich suspicious IPs
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 ![GitHub last commit](https://img.shields.io/github/last-commit/OuttaMyDepth/NetherGaze)
 
-*Not a replacement for ELK or Grafana. It's a **live triage console** — competes with your own shell muscle memory, not big observability stacks.*
+*Not a replacement for ELK or Grafana. It's a **live triage console** this tool competes with your own shell muscle memory, not big observability stacks.*
 
-![Nethergaze dashboard — live traffic correlation](public/bot.png)
+![Nethergaze dashboard  live traffic correlation](public/bot.png)
 
-> **What you're seeing:** The left panel correlates each IP's TCP connections with its HTTP requests — country, org, connection count, and bytes all in one view. The right panel streams color-coded access log entries in real time. The top bar surfaces the highest-traffic IPs at a glance. An IP with 10 connections but zero requests? That's suspicious. An IP hammering `/wp-login.php` at 200 req/min? You'll see it instantly.
+> **What you're seeing:** The left panel correlates each IP's TCP connections with its HTTP requests, country, org, connection count, and bytes all in a single view. The right panel streams color coded access log entries in real time. The top bar surfaces the highest traffic IPs at a glance. An IP with 10 connections but zero requests? That's whack suspicious. An IP hammering `/wp-login.php` at 200 req/min? You'll see it instantly and can quickly block without needing to leave the tool or your chair.
 
-- **Top offenders bar** — Real-time req/s, new connections/s, and top 3 IPs by request rate and connection count
-- **IP drill-down** — Press Enter on any IP for full detail: connections, recent requests, whois info
-- **Suspicious mode** — One-key toggle to surface SYN floods, scanners, and burst traffic
-- **Structured filters** — Filter by TCP state, status codes, request rate, CIDR ranges, or free text — applied to both panels
-- **Block assist** — Auto-detect your firewall (ufw/nft/iptables) and generate or execute block commands from the TUI
-- **Auto-enrichment** — GeoIP and whois/RDAP lookups run in background threads for every new IP
+- **Top offenders bar** — Real time req/s, new connections/s, and top 3 IPs by request rate and connection count
+- **IP drill-down**  Press Enter on any IP for full detail: connections, recent requests, whois info
+- **Suspicious mode**  One key toggle to surface SYN floods, scanners, and burst traffic
+- **Structured filters**  Filter by TCP state, status codes, request rate, CIDR ranges, or free text  applied to both panels
+- **Block assist**  Auto detect your firewall (ufw/nft/iptables) and generate or execute block commands from the TUI
+- **Auto-enrichment**  GeoIP and whois/RDAP lookups run in background threads for every new IP
 
 ## Why It Matters
 
-During initial deployment, Nethergaze revealed a **SYN flood attack** — 254 half-open connections from a Brazilian botnet (~30 IPs across two /24 blocks) hammering port 443. The connections showed up in the table with country/org data but zero completed requests, which made the pattern immediately obvious. Without this kind of correlation between TCP state and HTTP logs, the attack would have gone unnoticed until performance degraded.
+During my initial deployment, Nethergaze revealed a **SYN flood attack** — 254 half-open connections from a Brazilian botnet (~30 IPs across two /24 blocks) hammering port 443. The connections showed up in the table with country/org data but zero completed requests, which made the pattern immediately obvious. Without this kind of correlation between TCP state and HTTP logs, the attack would have gone unnoticed until performance degraded or my vps host reached out and yelled at me.
 
 Pressing `!` to toggle suspicious mode instantly filtered the view down to only the attacking IPs. Pressing `b` generated a `sudo ufw insert 1 deny from ...` command ready to copy and run.
 
-![Suspicious mode — filtering to botnet traffic only](public/susmode.png)
+![Suspicious mode  filtering to botnet traffic only](public/susmode.png)
 
-> **What you're seeing:** Suspicious mode (`!`) filtered the table to only anomalous IPs. Every row is BR / 67 TELECOM with 10+ connections, zero requests, zero bytes — a textbook SYN flood. The top bar confirms the pattern: `TopConn` shows the worst offenders. From here, `b` generates a firewall block command and `c` copies the IP.
+> **What you're seeing:** Suspicious mode (`!`) filtered the table to only anomalous IPs. Every row is BR / 67 TELECOM with 10+ connections, zero requests, zero bytes — a textbook SYN flood. The top bar confirms the pattern: `TopConn` shows the worst offenders. From here, `b` generates a firewall block command and `c` copies the IP. This was a happy accident during testing.
 
-`ss` shows connections but not what they're requesting. Access logs show requests but not TCP state. Nethergaze joins them by IP in real time so anomalies — botnets, scanners, misbehaving clients — stand out at a glance.
+`ss` shows connections but not what they're requesting. Access logs show requests but not TCP state. Nethergaze joins them by IP in real time so anomalies, botnets, scanners, misbehaving clients all that stand out at a quick glance.
 
 ## How It Works
 
@@ -49,12 +49,12 @@ GeoIP (sync, cached)    -->                  --> Filter Engine
 
 **What makes it fast:** Nethergaze runs on the same box it monitors without adding load.
 
-- **Connections** — Reads `/proc/net/tcp` directly (no subprocess). Faster than shelling out to `ss` or `netstat`.
-- **Log tailing** — Inode-based rotation detection, seek-to-end on first open (only tails new lines, never replays the full file). Glob patterns tail all vhost logs simultaneously.
-- **GeoIP** — Sync lookups against local MMDB files, memory-cached. No network calls. ~0.1ms per lookup.
-- **Whois/RDAP** — Async in a capped thread pool (3 workers). RDAP first, legacy whois fallback, 10s timeouts, disk-cached 24h. Failed lookups retry on next encounter.
-- **Per-IP rate tracking** — Rolling 60-second window powers filters, suspicious mode, and the top offenders bar.
-- **Enrichment off** — `--no-whois --no-geoip` disables all outbound calls for high-traffic environments.
+- **Connections**  Reads `/proc/net/tcp` directly (no subprocess). Faster than shelling out to `ss` or `netstat`.
+- **Log tailing**  Inode-based rotation detection, seek to end on first open (only tails new lines, never replays the full file). Glob patterns tail all vhost logs simultaneously.
+- **GeoIP**  Sync lookups against local MMDB files, memory cached. No network calls. ~0.1ms per lookup.
+- **Whois/RDAP** Async in a capped thread pool (3 workers). RDAP first, legacy whois fallback, 10s timeouts, disk-cached 24h. Failed lookups retry on next encounter.
+- **Per-IP rate tracking** —Rolling 60 second window powers filters, suspicious mode, and the top offenders bar.
+- **Enrichment off**  `--no-whois --no-geoip` disables all outbound calls for high traffic environments.
 
 No telemetry, no analytics, no phoning home. The only outbound calls are whois/RDAP lookups for IP enrichment, and those are opt-out with `--no-whois`.
 
@@ -64,7 +64,7 @@ No telemetry, no analytics, no phoning home. The only outbound calls are whois/R
 pipx install git+https://github.com/OuttaMyDepth/NetherGaze.git
 ```
 
-That's it — no clone, no venv. To hack on it:
+To hack on it:
 
 ```bash
 git clone https://github.com/OuttaMyDepth/NetherGaze.git
@@ -90,7 +90,7 @@ sudo mv dbip-asn-lite-*.mmdb /usr/share/GeoIP/GeoLite2-ASN.mmdb
 ## Quick Start
 
 ```bash
-# Just run it — auto-discovers per-vhost nginx logs
+# auto-discovers per-vhost nginx logs
 nethergaze
 
 # Point at specific logs
@@ -102,7 +102,7 @@ nethergaze --log-path "/var/log/nginx/*.access.log"
 # Caddy JSON logs
 nethergaze --log-path "/var/log/caddy/access.log" --log-format json
 
-# Headless / high-traffic — skip enrichment
+# Headless / high-traffic skip enrichment
 nethergaze --no-whois --no-geoip
 ```
 
@@ -113,7 +113,7 @@ log_path = "/var/log/nginx/*.access.log"
 interface = "eth0"
 ```
 
-That's it. Everything else has sensible defaults.
+Everything else has reasonable defaults.
 
 ### Log Format Support
 
