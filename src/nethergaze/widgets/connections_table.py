@@ -82,11 +82,13 @@ class ConnectionsTable(Static):
             reverse=self._sort_reverse,
         )
 
-        # Remember cursor position
+        # Remember selected IP (not row index) so cursor survives re-sorting
+        selected_ip: str | None = None
         try:
-            cursor_row = table.cursor_row
+            row = table.get_row_at(table.cursor_row)
+            selected_ip = str(row[0]) if row else None
         except Exception:
-            cursor_row = 0
+            pass
 
         table.clear()
         for profile in sorted_profiles:
@@ -109,10 +111,13 @@ class ConnectionsTable(Static):
                 key=profile.ip,
             )
 
-        # Restore cursor
-        if sorted_profiles and cursor_row < len(sorted_profiles):
+        # Restore cursor to the same IP
+        if selected_ip and sorted_profiles:
             try:
-                table.move_cursor(row=cursor_row)
+                for idx, p in enumerate(sorted_profiles):
+                    if p.ip == selected_ip:
+                        table.move_cursor(row=idx)
+                        break
             except Exception:
                 pass
 

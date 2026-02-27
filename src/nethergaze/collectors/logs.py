@@ -154,15 +154,24 @@ class MultiLogWatcher:
         self._rescan()
 
     def _rescan(self) -> None:
-        """Expand glob and create watchers for any new files."""
-        paths = sorted(_glob.glob(self._pattern))
-        for p in paths:
+        """Expand glob and create watchers for any new files.
+
+        Also removes watchers for files that no longer exist.
+        """
+        paths = set(_glob.glob(self._pattern))
+        # Add watchers for new files
+        for p in sorted(paths):
             if p not in self._watchers:
                 self._watchers[p] = LogWatcher(
                     p,
                     max_entries_per_ip=self._max_entries_per_ip,
                     log_format=self._log_format,
                 )
+        # Remove watchers for deleted files
+        for p in list(self._watchers):
+            if p not in paths:
+                self._watchers[p].close()
+                del self._watchers[p]
 
     def poll(self) -> list[LogEntry]:
         """Poll all watched log files and return combined new entries."""

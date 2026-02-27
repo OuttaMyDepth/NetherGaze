@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import patch
 
 from nethergaze.actions import detect_firewall, generate_block_command
+from nethergaze.models import ActionHook
 
 
 class TestDetectFirewall:
@@ -51,3 +52,29 @@ class TestGenerateBlockCommand:
     def test_unknown(self):
         cmd = generate_block_command("1.2.3.4", firewall="unknown")
         assert "manually" in cmd.lower() or "#" in cmd
+
+
+class TestActionHook:
+    def test_ip_substitution(self):
+        hook = ActionHook(key="1", label="Reverse DNS", command="dig -x {ip}")
+        cmd = hook.command.replace("{ip}", "93.184.216.34")
+        assert cmd == "dig -x 93.184.216.34"
+
+    def test_parse_from_config_dicts(self):
+        """Verify the parsing logic used by DashboardScreen."""
+        raw = [
+            {"key": "1", "label": "Reverse DNS", "command": "dig -x {ip}"},
+            {"key": "2", "label": "Ping", "command": "ping -c 3 {ip}"},
+            {"key": "", "label": "Bad", "command": "echo"},  # should be skipped
+            {"label": "No key", "command": "echo"},  # should be skipped
+        ]
+        hooks = []
+        for d in raw:
+            key = d.get("key", "")
+            label = d.get("label", "")
+            command = d.get("command", "")
+            if key and label and command:
+                hooks.append(ActionHook(key=key, label=label, command=command))
+        assert len(hooks) == 2
+        assert hooks[0].key == "1"
+        assert hooks[1].label == "Ping"

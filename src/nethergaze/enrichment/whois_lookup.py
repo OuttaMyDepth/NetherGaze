@@ -35,6 +35,7 @@ class WhoisLookupService:
         self._cache: dict[str, tuple[WhoisInfo, float]] = {}
         self._pending: set[str] = set()
         self._lock = threading.Lock()
+        self._disk_lock = threading.Lock()
         self._cache_ttl = cache_ttl
         self._cache_dir = Path(cache_dir) if cache_dir else None
         self._semaphore = threading.Semaphore(max_workers)
@@ -231,28 +232,34 @@ class WhoisLookupService:
             pass
 
     def _save_to_disk(self, ip: str, info: WhoisInfo) -> None:
-        """Persist a single whois result to disk cache."""
+        """Persist a single whois result to disk cache.
+
+        Uses a dedicated lock to prevent concurrent read-modify-write corruption
+        when multiple whois worker threads complete simultaneously.
+        """
         if not self._cache_dir:
             return
-        self._cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = self._cache_dir / "whois_cache.json"
 
-        try:
-            if cache_file.exists():
-                data = json.loads(cache_file.read_text())
-            else:
+        with self._disk_lock:
+            self._cache_dir.mkdir(parents=True, exist_ok=True)
+            cache_file = self._cache_dir / "whois_cache.json"
+
+            try:
+                if cache_file.exists():
+                    data = json.loads(cache_file.read_text())
+                else:
+                    data = {}
+            except (json.JSONDecodeError, TypeError):
                 data = {}
-        except (json.JSONDecodeError, TypeError):
-            data = {}
 
-        data[ip] = {
-            "network_name": info.network_name,
-            "network_cidr": info.network_cidr,
-            "description": info.description,
-            "abuse_contact": info.abuse_contact,
-            "_ts": time.time(),
-        }
-        cache_file.write_text(json.dumps(data, indent=2))
+            data[ip] = {
+                "network_name": info.network_name,
+                "network_cidr": info.network_cidr,
+                "description": info.description,
+                "abuse_contact": info.abuse_contact,
+                "_ts": time.time(),
+            }
+            cache_file.write_text(json.dumps(data, indent=2))
 
     def shutdown(self) -> None:
         """Signal all threads to stop."""

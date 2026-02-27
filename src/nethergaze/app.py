@@ -116,12 +116,17 @@ class NethergazeApp(App):
         self._delegate("action_suggest_block")
 
     def action_help(self) -> None:
-        self.notify(
-            "q:Quit  Tab:Focus  Enter:Detail  s:Sort  w:Whois  r:Refresh\n"
+        lines = [
+            "q:Quit  Tab:Focus  Enter:Detail  s:Sort  w:Whois  r:Refresh",
             "/:Text filter  f:Filters  !:Suspicious  c:Copy IP  b:Block  ?:Help",
-            title="Key Bindings",
-            timeout=5,
-        )
+        ]
+        # Include configured action hooks
+        screen = self.screen
+        hooks = getattr(screen, "action_hooks", [])
+        if hooks:
+            hook_str = "  ".join(f"{h.key}:{h.label}" for h in hooks)
+            lines.append(f"Hooks: {hook_str}")
+        self.notify("\n".join(lines), title="Key Bindings", timeout=5)
 
     def _shutdown_services(self) -> None:
         if self.log_watcher:

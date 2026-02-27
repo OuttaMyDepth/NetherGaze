@@ -77,3 +77,34 @@ class TestLogFormatConfig:
         monkeypatch.setenv("NETHERGAZE_LOG_FORMAT", "common")
         config = AppConfig.load()
         assert config.log_format == "common"
+
+
+class TestActionHooksConfig:
+    def test_default_empty(self):
+        config = AppConfig()
+        assert config.action_hooks == []
+
+    def test_load_from_toml(self, tmp_path):
+        config_file = tmp_path / "config.toml"
+        content = textwrap.dedent("""\
+            [actions]
+            enable_block_execution = true
+
+            [[actions.hooks]]
+            key = "1"
+            label = "Reverse DNS"
+            command = "dig -x {ip}"
+
+            [[actions.hooks]]
+            key = "2"
+            label = "Ping"
+            command = "ping -c 3 {ip}"
+        """)
+        config_file.write_text(content)
+        config = AppConfig.load(config_path=str(config_file))
+        assert config.enable_block_execution is True
+        assert len(config.action_hooks) == 2
+        assert config.action_hooks[0]["key"] == "1"
+        assert config.action_hooks[0]["label"] == "Reverse DNS"
+        assert config.action_hooks[0]["command"] == "dig -x {ip}"
+        assert config.action_hooks[1]["key"] == "2"

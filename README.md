@@ -15,10 +15,11 @@ Live correlate TCP connection state with HTTP requests and enrich suspicious IPs
 > **What you're seeing:** The left panel correlates each IP's TCP connections with its HTTP requests, country, org, connection count, and bytes all in a single view. The right panel streams color coded access log entries in real time. The top bar surfaces the highest traffic IPs at a glance. An IP with 10 connections but zero requests? That's whack suspicious. An IP hammering `/wp-login.php` at 200 req/min? You'll see it instantly and can quickly block without needing to leave the tool or your chair.
 
 - **Top offenders bar** — Real time req/s, new connections/s, and top 3 IPs by request rate and connection count
-- **IP drill-down**  Press Enter on any IP for full detail: connections, recent requests, whois info
+- **IP drill-down**  Press Enter on any IP for live-updating detail: connections, recent requests, whois info — all refresh while the modal is open
 - **Suspicious mode**  One key toggle to surface SYN floods, scanners, and burst traffic
 - **Structured filters**  Filter by TCP state, status codes, request rate, CIDR ranges, or free text  applied to both panels
 - **Block assist**  Auto detect your firewall (ufw/nft/iptables) and generate or execute block commands from the TUI
+- **Custom action hooks**  Define your own keybindings that run shell commands on the selected IP (`dig -x {ip}`, `ping -c 3 {ip}`, anything you want)
 - **Auto-enrichment**  GeoIP and whois/RDAP lookups run in background threads for every new IP
 
 ## Why It Matters
@@ -50,7 +51,7 @@ GeoIP (sync, cached)    -->                  --> Filter Engine
 **What makes it fast:** Nethergaze runs on the same box it monitors without adding load.
 
 - **Connections**  Reads `/proc/net/tcp` directly (no subprocess). Faster than shelling out to `ss` or `netstat`.
-- **Log tailing**  Inode-based rotation detection, seek to end on first open (only tails new lines, never replays the full file). Glob patterns tail all vhost logs simultaneously.
+- **Log tailing**  Inode-based rotation detection, seek to end on first open (only tails new lines, never replays the full file). Glob patterns tail all vhost logs simultaneously with automatic discovery of new log files every 30 seconds.
 - **GeoIP**  Sync lookups against local MMDB files, memory cached. No network calls. ~0.1ms per lookup.
 - **Whois/RDAP** Async in a capped thread pool (3 workers). RDAP first, legacy whois fallback, 10s timeouts, disk-cached 24h. Failed lookups retry on next encounter.
 - **Per-IP rate tracking** —Rolling 60 second window powers filters, suspicious mode, and the top offenders bar.
@@ -141,7 +142,8 @@ Auto-detected per line. Override with `--log-format` if needed:
 | `!` | Toggle suspicious mode — surface SYN floods, scanners, burst traffic |
 | `c` | Copy selected IP to clipboard |
 | `b` | Show block command for selected IP (auto-detects ufw/nft/iptables) |
-| `?` | Show key bindings |
+| `1`, `2`, ... | Run custom action hooks on selected IP (configurable, see below) |
+| `?` | Show key bindings (includes configured hooks) |
 
 ## Configuration
 
@@ -180,12 +182,20 @@ suspicious_min_conns = 5       # Min connections for "high conns + low reqs" pat
 
 [actions]
 enable_block_execution = false  # Allow executing block commands (requires sudo)
-# Custom action hooks:
-# [[actions.hooks]]
-# key = "1"
-# label = "Reverse DNS"
-# command = "dig -x {ip}"
+
+# Custom action hooks — run any shell command on the selected IP
+[[actions.hooks]]
+key = "1"
+label = "Reverse DNS"
+command = "dig -x {ip}"
+
+[[actions.hooks]]
+key = "2"
+label = "Ping"
+command = "ping -c 3 {ip}"
 ```
+
+Action hooks bind a key to a shell command with `{ip}` replaced by the selected IP. When triggered, a modal shows the command output with an option to copy it. Press `?` to see all configured hooks in the help overlay.
 
 Resolution order: CLI flags > environment variables (`NETHERGAZE_*`) > config file > defaults.
 

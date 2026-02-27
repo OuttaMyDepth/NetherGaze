@@ -2,7 +2,7 @@
 
 import json
 
-from nethergaze.collectors.logs import LogFormat, LogWatcher, parse_log_line
+from nethergaze.collectors.logs import LogFormat, LogWatcher, MultiLogWatcher, parse_log_line
 
 
 class TestParseLogLine:
@@ -244,4 +244,60 @@ class TestLogWatcher:
         assert len(entries) == 1
         assert entries[0].remote_ip == "5.6.7.8"
         assert entries[0].path == "/api"
+        watcher.close()
+
+
+class TestMultiLogWatcher:
+    def test_rescan_picks_up_new_files(self, tmp_path):
+        # Start with one log file
+        log1 = tmp_path / "site1.access.log"
+        log1.write_text("")
+        pattern = str(tmp_path / "*.access.log")
+        watcher = MultiLogWatcher(pattern)
+        assert len(watcher._watchers) == 1
+
+        # Add a second file and rescan
+        log2 = tmp_path / "site2.access.log"
+        log2.write_text("")
+        watcher.rescan()
+        assert len(watcher._watchers) == 2
+        assert str(log2) in watcher._watchers
+        watcher.close()
+
+    def test_rescan_removes_deleted_files(self, tmp_path):
+        log1 = tmp_path / "site1.access.log"
+        log1.write_text("")
+        log2 = tmp_path / "site2.access.log"
+        log2.write_text("")
+        pattern = str(tmp_path / "*.access.log")
+        watcher = MultiLogWatcher(pattern)
+        assert len(watcher._watchers) == 2
+
+        # Delete one file and rescan
+        log2.unlink()
+        watcher.rescan()
+        assert len(watcher._watchers) == 1
+        assert str(log1) in watcher._watchers
+        assert str(log2) not in watcher._watchers
+        watcher.close()
+
+    def test_poll_across_multiple_files(self, tmp_path):
+        log1 = tmp_path / "site1.access.log"
+        log2 = tmp_path / "site2.access.log"
+        log1.write_text("")
+        log2.write_text("")
+        pattern = str(tmp_path / "*.access.log")
+        watcher = MultiLogWatcher(pattern)
+        # First poll — seek to end
+        watcher.poll()
+
+        with open(log1, "a") as f:
+            f.write('1.2.3.4 - - [01/Jan/2025:12:00:00 +0000] "GET /a HTTP/1.1" 200 100 "-" "test"\n')
+        with open(log2, "a") as f:
+            f.write('5.6.7.8 - - [01/Jan/2025:12:00:01 +0000] "GET /b HTTP/1.1" 200 200 "-" "test"\n')
+
+        entries = watcher.poll()
+        assert len(entries) == 2
+        ips = {e.remote_ip for e in entries}
+        assert ips == {"1.2.3.4", "5.6.7.8"}
         watcher.close()

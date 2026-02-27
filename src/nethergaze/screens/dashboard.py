@@ -16,6 +16,7 @@ from nethergaze.correlation import CorrelationEngine
 from nethergaze.enrichment.geoip import GeoIPLookup
 from nethergaze.enrichment.whois_lookup import WhoisLookupService
 from nethergaze.filters import FilterState, parse_cidr_list
+from nethergaze.models import ActionHook
 from nethergaze.utils import is_private_ip
 from nethergaze.widgets.connections_table import ConnectionsTable
 from nethergaze.widgets.header_bar import HeaderBar
@@ -52,6 +53,15 @@ class DashboardScreen(Screen):
         )
         self._pre_suspicious_filters: FilterState | None = None
 
+        # Parse action hooks from config
+        self._action_hooks: list[ActionHook] = []
+        for hook_dict in config.action_hooks:
+            key = hook_dict.get("key", "")
+            label = hook_dict.get("label", "")
+            command = hook_dict.get("command", "")
+            if key and label and command:
+                self._action_hooks.append(ActionHook(key=key, label=label, command=command))
+
     def compose(self) -> ComposeResult:
         yield HeaderBar()
         yield OffendersBar()
@@ -76,6 +86,9 @@ class DashboardScreen(Screen):
             self._poll_bandwidth,
         )
         self.set_interval(60.0, self._trim_stale)
+        # Rescan for new log files every 30s (only relevant for glob-based MultiLogWatcher)
+        if isinstance(self.log_watcher, MultiLogWatcher):
+            self.set_interval(30.0, self.log_watcher.rescan)
         # Initial bandwidth check
         self._poll_bandwidth()
 
@@ -215,7 +228,7 @@ class DashboardScreen(Screen):
 
         profile = self.engine.get_profile(event.ip)
         if profile:
-            self.app.push_screen(IPDetailScreen(profile, self.whois))
+            self.app.push_screen(IPDetailScreen(profile, self.whois, engine=self.engine))
 
     # --- Actions ---
 
@@ -332,6 +345,37 @@ class DashboardScreen(Screen):
         self.app.push_screen(
             BlockScreen(ip, allow_execute=self.config.enable_block_execution)
         )
+
+    # --- Action hooks ---
+
+    def on_key(self, event) -> None:
+        """Handle custom action hook key presses."""
+        if not self._action_hooks:
+            return
+        # Don't intercept when filter input is focused
+        filter_input = self.query_one("#filter-input", Input)
+        if filter_input.has_class("visible"):
+            return
+        for hook in self._action_hooks:
+            if event.character == hook.key:
+                ip = self._get_selected_ip()
+                if ip:
+                    self._run_action_hook(hook, ip)
+                else:
+                    self.notify("No IP selected", severity="warning")
+                event.prevent_default()
+                event.stop()
+                return
+
+    def _run_action_hook(self, hook: ActionHook, ip: str) -> None:
+        from nethergaze.screens.hook_screen import HookOutputScreen
+
+        self.app.push_screen(HookOutputScreen(hook, ip))
+
+    @property
+    def action_hooks(self) -> list[ActionHook]:
+        """Expose configured hooks for help text generation."""
+        return self._action_hooks
 
     def _trim_stale(self) -> None:
         self.engine.trim_stale_profiles(max_age_seconds=300)

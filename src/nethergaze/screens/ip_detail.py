@@ -8,6 +8,7 @@ from textual.containers import Vertical, VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, RichLog, Static
 
+from nethergaze.correlation import CorrelationEngine
 from nethergaze.enrichment.whois_lookup import WhoisLookupService
 from nethergaze.models import IPProfile, TCPState
 from nethergaze.utils import format_bytes
@@ -58,10 +59,17 @@ class IPDetailScreen(ModalScreen[None]):
     }
     """
 
-    def __init__(self, profile: IPProfile, whois_service: WhoisLookupService | None = None) -> None:
+    def __init__(
+        self,
+        profile: IPProfile,
+        whois_service: WhoisLookupService | None = None,
+        engine: CorrelationEngine | None = None,
+    ) -> None:
         super().__init__()
         self.profile = profile
         self.whois_service = whois_service
+        self._engine = engine
+        self._last_log_count = len(profile.log_entries)
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="detail-container"):
@@ -136,6 +144,72 @@ class IPDetailScreen(ModalScreen[None]):
             text.append(f" ({format_bytes(entry.bytes_sent)})", style="dim")
             log.write(text)
         return log
+
+    def on_mount(self) -> None:
+        if self._engine:
+            self.set_interval(2.0, self._refresh_from_engine)
+
+    def _refresh_from_engine(self) -> None:
+        """Refresh profile data from the correlation engine."""
+        if not self._engine:
+            return
+        fresh = self._engine.get_profile(self.profile.ip)
+        if not fresh:
+            return
+        self.profile = fresh
+
+        # Update stats
+        try:
+            self.query_one("#detail-stats", Static).update(self._stats_text())
+        except Exception:
+            pass
+
+        # Update whois if it arrived
+        try:
+            self.query_one("#detail-whois", Static).update(self._whois_text())
+        except Exception:
+            pass
+
+        # Rebuild connections table
+        try:
+            table = self.query_one("#detail-connections", DataTable)
+            table.clear()
+            for conn in self.profile.connections:
+                table.add_row(
+                    str(conn.local_port),
+                    str(conn.remote_port),
+                    conn.state.name,
+                    str(conn.pid or "?"),
+                    conn.process_name or "?",
+                )
+        except Exception:
+            pass
+
+        # Append new log entries
+        new_count = len(self.profile.log_entries)
+        if new_count > self._last_log_count:
+            try:
+                log = self.query_one("#detail-requests", RichLog)
+                for entry in self.profile.log_entries[self._last_log_count:]:
+                    status = entry.status_code
+                    if status < 300:
+                        style = "green"
+                    elif status < 400:
+                        style = "cyan"
+                    elif status < 500:
+                        style = "yellow"
+                    else:
+                        style = "red bold"
+                    text = Text()
+                    text.append(entry.timestamp.strftime("%H:%M:%S"), style="dim")
+                    text.append(f" {status} ", style=style)
+                    text.append(f"{entry.method:6s} ", style="bold")
+                    text.append(entry.path)
+                    text.append(f" ({format_bytes(entry.bytes_sent)})", style="dim")
+                    log.write(text)
+            except Exception:
+                pass
+            self._last_log_count = new_count
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "close-btn":
