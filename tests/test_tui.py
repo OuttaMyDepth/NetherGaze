@@ -103,11 +103,34 @@ class TestFilterScreen:
         app = _make_app(test_config)
         async with app.run_test() as pilot:
             await pilot.press("f")
-            # FilterScreen should be pushed
             from nethergaze.screens.filter_screen import FilterScreen
 
             assert isinstance(app.screen, FilterScreen)
             await pilot.press("escape")
+            assert isinstance(app.screen, DashboardScreen)
+
+
+class TestHelpScreen:
+    @pytest.mark.asyncio
+    async def test_open_and_close(self, test_config):
+        app = _make_app(test_config)
+        async with app.run_test() as pilot:
+            await pilot.press("question_mark")
+            from nethergaze.screens.help_screen import HelpScreen
+
+            assert isinstance(app.screen, HelpScreen)
+            await pilot.press("escape")
+            assert isinstance(app.screen, DashboardScreen)
+
+    @pytest.mark.asyncio
+    async def test_close_with_question_mark(self, test_config):
+        app = _make_app(test_config)
+        async with app.run_test() as pilot:
+            await pilot.press("question_mark")
+            from nethergaze.screens.help_screen import HelpScreen
+
+            assert isinstance(app.screen, HelpScreen)
+            await pilot.press("question_mark")
             assert isinstance(app.screen, DashboardScreen)
 
 

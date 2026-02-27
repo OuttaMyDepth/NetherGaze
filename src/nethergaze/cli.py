@@ -46,6 +46,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Network interface for bandwidth stats (default: eth0)",
     )
     parser.add_argument(
+        "--show-private-ips",
+        action="store_true",
+        help="Show connections from private/reserved IP ranges",
+    )
+    parser.add_argument(
         "--no-geoip",
         action="store_true",
         help="Disable GeoIP lookups",
@@ -72,6 +77,8 @@ def main(argv: list[str] | None = None) -> None:
         overrides["connections_interval"] = args.connections_interval
     if args.interface:
         overrides["interface"] = args.interface
+    if args.show_private_ips:
+        overrides["show_private_ips"] = True
     if args.no_geoip:
         overrides["geoip_enabled"] = False
     if args.no_whois:
