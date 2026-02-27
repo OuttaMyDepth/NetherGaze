@@ -1,6 +1,6 @@
 """Bottom stats bar widget showing aggregate metrics."""
 
-from __future__  import annotations
+from __future__ import annotations
 
 from textual.widgets import Static
 

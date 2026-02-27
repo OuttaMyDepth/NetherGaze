@@ -51,7 +51,9 @@ class AppConfig:
     action_hooks: list[dict] = field(default_factory=list)
 
     # Paths
-    cache_dir: str = field(default_factory=lambda: str(Path.home() / ".cache" / "nethergaze"))
+    cache_dir: str = field(
+        default_factory=lambda: str(Path.home() / ".cache" / "nethergaze")
+    )
 
     @classmethod
     def load(
@@ -141,7 +143,11 @@ def _apply_toml(config: AppConfig, data: dict) -> None:
         if section in data:
             for key in keys:
                 # Map section keys: e.g., geoip.enabled -> geoip_enabled
-                short_key = key.removeprefix(f"{section}_") if key.startswith(f"{section}_") else key
+                short_key = (
+                    key.removeprefix(f"{section}_")
+                    if key.startswith(f"{section}_")
+                    else key
+                )
                 if short_key in data[section]:
                     setattr(config, key, data[section][short_key])
 
@@ -152,8 +158,14 @@ def _apply_env(config: AppConfig) -> None:
         "NETHERGAZE_LOG_PATH": ("log_path", str),
         "NETHERGAZE_LOG_FORMAT": ("log_format", str),
         "NETHERGAZE_INTERFACE": ("interface", str),
-        "NETHERGAZE_GEOIP_ENABLED": ("geoip_enabled", lambda v: v.lower() in ("1", "true", "yes")),
-        "NETHERGAZE_WHOIS_ENABLED": ("whois_enabled", lambda v: v.lower() in ("1", "true", "yes")),
+        "NETHERGAZE_GEOIP_ENABLED": (
+            "geoip_enabled",
+            lambda v: v.lower() in ("1", "true", "yes"),
+        ),
+        "NETHERGAZE_WHOIS_ENABLED": (
+            "whois_enabled",
+            lambda v: v.lower() in ("1", "true", "yes"),
+        ),
         "NETHERGAZE_GEOIP_CITY_DB": ("geoip_city_db", str),
         "NETHERGAZE_GEOIP_ASN_DB": ("geoip_asn_db", str),
     }

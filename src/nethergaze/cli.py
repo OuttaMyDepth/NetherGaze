@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 
 from nethergaze import __version__
 from nethergaze.config import AppConfig

@@ -176,7 +176,10 @@ class WhoisLookupService:
         objects = result.get("objects", {})
         for obj_data in objects.values():
             contact = obj_data.get("contact", {})
-            if contact.get("role") == "abuse" or "abuse" in obj_data.get("handle", "").lower():
+            if (
+                contact.get("role") == "abuse"
+                or "abuse" in obj_data.get("handle", "").lower()
+            ):
                 for email_entry in contact.get("email", []):
                     if isinstance(email_entry, dict):
                         info.abuse_contact = email_entry.get("value", "")

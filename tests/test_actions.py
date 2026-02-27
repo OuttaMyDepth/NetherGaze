@@ -10,7 +10,10 @@ from nethergaze.models import ActionHook
 
 class TestDetectFirewall:
     def test_ufw_preferred(self):
-        with patch("shutil.which", side_effect=lambda t: "/usr/sbin/ufw" if t == "ufw" else None):
+        with patch(
+            "shutil.which",
+            side_effect=lambda t: "/usr/sbin/ufw" if t == "ufw" else None,
+        ):
             assert detect_firewall() == "ufw"
 
     def test_nft_fallback(self):
@@ -18,6 +21,7 @@ class TestDetectFirewall:
             if tool == "nft":
                 return "/usr/sbin/nft"
             return None
+
         with patch("shutil.which", side_effect=which):
             assert detect_firewall() == "nft"
 
@@ -26,6 +30,7 @@ class TestDetectFirewall:
             if tool == "iptables":
                 return "/usr/sbin/iptables"
             return None
+
         with patch("shutil.which", side_effect=which):
             assert detect_firewall() == "iptables"
 

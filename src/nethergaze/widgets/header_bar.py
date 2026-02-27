@@ -5,7 +5,6 @@ from __future__ import annotations
 import platform
 from pathlib import Path
 
-from textual.app import ComposeResult
 from textual.widgets import Static
 
 from nethergaze.models import BandwidthStats

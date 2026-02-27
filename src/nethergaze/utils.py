@@ -80,6 +80,11 @@ def is_private_ip(ip_str: str) -> bool:
     """Check whether an IP address is private/reserved."""
     try:
         addr = ipaddress.ip_address(ip_str)
-        return addr.is_private or addr.is_loopback or addr.is_reserved or addr.is_link_local
+        return (
+            addr.is_private
+            or addr.is_loopback
+            or addr.is_reserved
+            or addr.is_link_local
+        )
     except ValueError:
         return False

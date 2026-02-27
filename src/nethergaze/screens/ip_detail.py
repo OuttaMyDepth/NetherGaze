@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from rich.text import Text
 from textual.app import ComposeResult
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import VerticalScroll
 from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, RichLog, Static
 
 from nethergaze.correlation import CorrelationEngine
 from nethergaze.enrichment.whois_lookup import WhoisLookupService
-from nethergaze.models import IPProfile, TCPState
+from nethergaze.models import IPProfile
 from nethergaze.utils import format_bytes
 
 
@@ -95,8 +95,7 @@ class IPDetailScreen(ModalScreen[None]):
         if not whois:
             return "Whois: press 'w' to look up"
         return (
-            f"Whois: {whois.network_name} ({whois.network_cidr})\n"
-            f"  {whois.description}"
+            f"Whois: {whois.network_name} ({whois.network_cidr})\n  {whois.description}"
         )
 
     def _stats_text(self) -> str:
@@ -190,7 +189,7 @@ class IPDetailScreen(ModalScreen[None]):
         if new_count > self._last_log_count:
             try:
                 log = self.query_one("#detail-requests", RichLog)
-                for entry in self.profile.log_entries[self._last_log_count:]:
+                for entry in self.profile.log_entries[self._last_log_count :]:
                     status = entry.status_code
                     if status < 300:
                         style = "green"

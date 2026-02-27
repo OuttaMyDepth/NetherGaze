@@ -2,7 +2,12 @@
 
 import json
 
-from nethergaze.collectors.logs import LogFormat, LogWatcher, MultiLogWatcher, parse_log_line
+from nethergaze.collectors.logs import (
+    LogFormat,
+    LogWatcher,
+    MultiLogWatcher,
+    parse_log_line,
+)
 
 
 class TestParseLogLine:
@@ -196,7 +201,9 @@ class TestLogWatcher:
 
         # Append new lines (simulates nginx writing)
         with open(log_file, "a") as f:
-            f.write('1.2.3.4 - - [01/Jan/2025:12:00:00 +0000] "GET / HTTP/1.1" 200 100 "-" "test"\n')
+            f.write(
+                '1.2.3.4 - - [01/Jan/2025:12:00:00 +0000] "GET / HTTP/1.1" 200 100 "-" "test"\n'
+            )
 
         entries = watcher.poll()
         assert len(entries) == 1
@@ -216,7 +223,9 @@ class TestLogWatcher:
         # Append 5 lines for same IP
         with open(log_file, "a") as f:
             for i in range(5):
-                f.write(f'1.2.3.4 - - [01/Jan/2025:12:00:0{i} +0000] "GET /p{i} HTTP/1.1" 200 100 "-" "test"\n')
+                f.write(
+                    f'1.2.3.4 - - [01/Jan/2025:12:00:0{i} +0000] "GET /p{i} HTTP/1.1" 200 100 "-" "test"\n'
+                )
 
         watcher.poll()
 
@@ -292,9 +301,13 @@ class TestMultiLogWatcher:
         watcher.poll()
 
         with open(log1, "a") as f:
-            f.write('1.2.3.4 - - [01/Jan/2025:12:00:00 +0000] "GET /a HTTP/1.1" 200 100 "-" "test"\n')
+            f.write(
+                '1.2.3.4 - - [01/Jan/2025:12:00:00 +0000] "GET /a HTTP/1.1" 200 100 "-" "test"\n'
+            )
         with open(log2, "a") as f:
-            f.write('5.6.7.8 - - [01/Jan/2025:12:00:01 +0000] "GET /b HTTP/1.1" 200 200 "-" "test"\n')
+            f.write(
+                '5.6.7.8 - - [01/Jan/2025:12:00:01 +0000] "GET /b HTTP/1.1" 200 200 "-" "test"\n'
+            )
 
         entries = watcher.poll()
         assert len(entries) == 2

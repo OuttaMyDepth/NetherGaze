@@ -136,7 +136,12 @@ def _build_inode_pid_map(proc_path: str = "/proc") -> dict[int, tuple[int, str]]
                     if target.startswith("socket:["):
                         inode = int(target[8:-1])
                         inode_map[inode] = (pid, comm)
-                except (PermissionError, FileNotFoundError, ProcessLookupError, ValueError):
+                except (
+                    PermissionError,
+                    FileNotFoundError,
+                    ProcessLookupError,
+                    ValueError,
+                ):
                     continue
         except (PermissionError, FileNotFoundError, ProcessLookupError):
             continue

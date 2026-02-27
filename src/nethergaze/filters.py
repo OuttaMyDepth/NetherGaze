@@ -9,8 +9,18 @@ from nethergaze.models import IPProfile, LogEntry, TCPState
 
 # Known scanner/bot user-agent substrings
 SCANNER_PATTERNS = [
-    "zgrab", "masscan", "nmap", "nikto", "sqlmap", "gobuster",
-    "dirbuster", "wfuzz", "nuclei", "httpx", "censys", "shodan",
+    "zgrab",
+    "masscan",
+    "nmap",
+    "nikto",
+    "sqlmap",
+    "gobuster",
+    "dirbuster",
+    "wfuzz",
+    "nuclei",
+    "httpx",
+    "censys",
+    "shodan",
 ]
 
 

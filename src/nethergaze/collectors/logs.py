@@ -24,30 +24,30 @@ class LogFormat(Enum):
 
 # Combined log format regex (nginx combined / Apache combined — CLF-derived)
 _COMBINED_PATTERN = re.compile(
-    r'(?P<remote_ip>\S+)\s+'         # client IP
-    r'\S+\s+'                         # ident (always -)
-    r'\S+\s+'                         # auth user
-    r'\[(?P<timestamp>[^\]]+)\]\s+'   # [timestamp]
-    r'"(?P<method>\S+)\s+'            # "METHOD
-    r'(?P<path>\S+)\s+'              # /path
-    r'(?P<protocol>[^"]+)"\s+'       # HTTP/1.1"
-    r'(?P<status>\d{3})\s+'          # status code
-    r'(?P<bytes>\d+|-)\s+'           # bytes sent
-    r'"(?P<referrer>[^"]*)"\s+'      # "referrer"
-    r'"(?P<user_agent>[^"]*)"'       # "user agent"
+    r"(?P<remote_ip>\S+)\s+"  # client IP
+    r"\S+\s+"  # ident (always -)
+    r"\S+\s+"  # auth user
+    r"\[(?P<timestamp>[^\]]+)\]\s+"  # [timestamp]
+    r'"(?P<method>\S+)\s+'  # "METHOD
+    r"(?P<path>\S+)\s+"  # /path
+    r'(?P<protocol>[^"]+)"\s+'  # HTTP/1.1"
+    r"(?P<status>\d{3})\s+"  # status code
+    r"(?P<bytes>\d+|-)\s+"  # bytes sent
+    r'"(?P<referrer>[^"]*)"\s+'  # "referrer"
+    r'"(?P<user_agent>[^"]*)"'  # "user agent"
 )
 
 # Common log format regex (same as combined but ends after bytes — no referrer/user-agent)
 _COMMON_PATTERN = re.compile(
-    r'(?P<remote_ip>\S+)\s+'         # client IP
-    r'\S+\s+'                         # ident (always -)
-    r'\S+\s+'                         # auth user
-    r'\[(?P<timestamp>[^\]]+)\]\s+'   # [timestamp]
-    r'"(?P<method>\S+)\s+'            # "METHOD
-    r'(?P<path>\S+)\s+'              # /path
-    r'(?P<protocol>[^"]+)"\s+'       # HTTP/1.1"
-    r'(?P<status>\d{3})\s+'          # status code
-    r'(?P<bytes>\d+|-)\s*$'          # bytes sent (end of line)
+    r"(?P<remote_ip>\S+)\s+"  # client IP
+    r"\S+\s+"  # ident (always -)
+    r"\S+\s+"  # auth user
+    r"\[(?P<timestamp>[^\]]+)\]\s+"  # [timestamp]
+    r'"(?P<method>\S+)\s+'  # "METHOD
+    r"(?P<path>\S+)\s+"  # /path
+    r'(?P<protocol>[^"]+)"\s+'  # HTTP/1.1"
+    r"(?P<status>\d{3})\s+"  # status code
+    r"(?P<bytes>\d+|-)\s*$"  # bytes sent (end of line)
 )
 
 _TIMESTAMP_FORMAT = "%d/%b/%Y:%H:%M:%S %z"
@@ -56,7 +56,9 @@ _TIMESTAMP_FORMAT = "%d/%b/%Y:%H:%M:%S %z"
 class LogWatcher:
     """Tails HTTP server access log, detects rotation, yields new entries."""
 
-    def __init__(self, log_path: str, max_entries_per_ip: int = 100, log_format: str = "auto"):
+    def __init__(
+        self, log_path: str, max_entries_per_ip: int = 100, log_format: str = "auto"
+    ):
         self.log_path = Path(log_path)
         self.max_entries_per_ip = max_entries_per_ip
         self.log_format = LogFormat(log_format)
@@ -185,7 +187,7 @@ class MultiLogWatcher:
                 buf = self._ip_buffers.setdefault(ip, [])
                 buf.extend(entries)
                 if len(buf) > self._max_entries_per_ip:
-                    self._ip_buffers[ip] = buf[-self._max_entries_per_ip:]
+                    self._ip_buffers[ip] = buf[-self._max_entries_per_ip :]
         # Sort combined entries by timestamp
         all_entries.sort(key=lambda e: e.timestamp)
         return all_entries
@@ -205,7 +207,9 @@ class MultiLogWatcher:
         self._watchers.clear()
 
 
-def parse_log_line(line: str, log_format: LogFormat = LogFormat.AUTO) -> LogEntry | None:
+def parse_log_line(
+    line: str, log_format: LogFormat = LogFormat.AUTO
+) -> LogEntry | None:
     """Parse a single HTTP server access log line.
 
     Supports combined (nginx/Apache), common (CLF), and JSON (Caddy-style) formats.

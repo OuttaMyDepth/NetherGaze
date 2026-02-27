@@ -31,7 +31,9 @@ class HttpActivityLog(Static):
         self._max_lines = max_lines
 
     def compose(self) -> ComposeResult:
-        yield RichLog(id="http-log", max_lines=self._max_lines, wrap=False, markup=False)
+        yield RichLog(
+            id="http-log", max_lines=self._max_lines, wrap=False, markup=False
+        )
 
     def add_entries(self, entries: list[LogEntry]) -> None:
         """Add new log entries to the log display."""

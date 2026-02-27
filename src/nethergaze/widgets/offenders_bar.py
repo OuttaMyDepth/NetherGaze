@@ -33,8 +33,6 @@ class OffendersBar(Static):
             )
             parts.append(f"TopReq: {top}")
         if summary.top_by_conns:
-            top = " ".join(
-                f"{ip}({n})" for ip, n in summary.top_by_conns[:3]
-            )
+            top = " ".join(f"{ip}({n})" for ip, n in summary.top_by_conns[:3])
             parts.append(f"TopConn: {top}")
         self.update(" | ".join(parts) + " ")

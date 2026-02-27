@@ -106,15 +106,19 @@ class TestCorrelationEngine:
 
     def test_aggregate_stats(self):
         engine = CorrelationEngine()
-        engine.update_connections([
-            _make_connection("1.2.3.4"),
-            _make_connection("5.6.7.8"),
-            _make_connection("5.6.7.8", TCPState.TIME_WAIT),
-        ])
-        engine.update_log_entries([
-            _make_log_entry("1.2.3.4"),
-            _make_log_entry("1.2.3.4"),
-        ])
+        engine.update_connections(
+            [
+                _make_connection("1.2.3.4"),
+                _make_connection("5.6.7.8"),
+                _make_connection("5.6.7.8", TCPState.TIME_WAIT),
+            ]
+        )
+        engine.update_log_entries(
+            [
+                _make_log_entry("1.2.3.4"),
+                _make_log_entry("1.2.3.4"),
+            ]
+        )
 
         stats = engine.get_aggregate_stats()
         assert stats.total_connections == 3
@@ -124,11 +128,13 @@ class TestCorrelationEngine:
 
     def test_get_profiles_sorted(self):
         engine = CorrelationEngine()
-        engine.update_connections([
-            _make_connection("1.1.1.1"),
-            _make_connection("2.2.2.2"),
-            _make_connection("2.2.2.2"),
-        ])
+        engine.update_connections(
+            [
+                _make_connection("1.1.1.1"),
+                _make_connection("2.2.2.2"),
+                _make_connection("2.2.2.2"),
+            ]
+        )
         profiles = engine.get_profiles()
         # 2.2.2.2 should be first (more connections)
         assert profiles[0].ip == "2.2.2.2"

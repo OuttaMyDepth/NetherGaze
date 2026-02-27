@@ -113,7 +113,8 @@ class CorrelationEngine:
         """Get IP profiles with activity, with computed per-IP request rates."""
         with self._lock:
             profiles = [
-                p for p in self._profiles.values()
+                p
+                for p in self._profiles.values()
                 if p.connections or p.total_requests > 0
             ]
             # Compute per-IP request rates
@@ -163,7 +164,8 @@ class CorrelationEngine:
             req_count = len(self._request_timestamps)
             new_conn_count = len(self._new_conn_timestamps)
             profiles = [
-                p for p in self._profiles.values()
+                p
+                for p in self._profiles.values()
                 if p.connections or p.total_requests > 0
             ]
             # Per-IP rates
@@ -206,7 +208,10 @@ class CorrelationEngine:
                 if profile.total_requests == 0 and not profile.connections:
                     to_remove.append(ip)
                     continue
-                if profile.last_seen and (cutoff - profile.last_seen).total_seconds() > max_age_seconds:
+                if (
+                    profile.last_seen
+                    and (cutoff - profile.last_seen).total_seconds() > max_age_seconds
+                ):
                     to_remove.append(ip)
             for ip in to_remove:
                 del self._profiles[ip]

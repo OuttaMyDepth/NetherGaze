@@ -6,7 +6,6 @@ from textual.app import ComposeResult
 from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Footer, Input
-from textual.worker import Worker, WorkerState
 
 from nethergaze.collectors.bandwidth import get_bandwidth
 from nethergaze.collectors.connections import get_connections
@@ -60,7 +59,9 @@ class DashboardScreen(Screen):
             label = hook_dict.get("label", "")
             command = hook_dict.get("command", "")
             if key and label and command:
-                self._action_hooks.append(ActionHook(key=key, label=label, command=command))
+                self._action_hooks.append(
+                    ActionHook(key=key, label=label, command=command)
+                )
 
     def compose(self) -> ComposeResult:
         yield HeaderBar()
@@ -69,7 +70,10 @@ class DashboardScreen(Screen):
             yield ConnectionsTable()
             yield HttpActivityLog(max_lines=self.config.max_log_lines)
         yield StatsBar()
-        yield Input(id="filter-input", placeholder="Filter log (Enter to apply, Escape to dismiss)")
+        yield Input(
+            id="filter-input",
+            placeholder="Filter log (Enter to apply, Escape to dismiss)",
+        )
         yield Footer()
 
     def on_mount(self) -> None:
@@ -138,9 +142,11 @@ class DashboardScreen(Screen):
             geo = self.geoip.lookup(ip)
             self.engine.update_geo(ip, geo)
         if self.whois and self.whois.available and profile.whois is None:
+
             def _on_whois(looked_ip, info):
                 self.engine.update_whois(looked_ip, info)
                 self.app.call_from_thread(self._refresh_table)
+
             self.whois.lookup(ip, callback=_on_whois)
 
     # --- Data polling workers ---
@@ -223,12 +229,16 @@ class DashboardScreen(Screen):
 
     # --- Events ---
 
-    def on_connections_table_ip_selected(self, event: ConnectionsTable.IPSelected) -> None:
+    def on_connections_table_ip_selected(
+        self, event: ConnectionsTable.IPSelected
+    ) -> None:
         from nethergaze.screens.ip_detail import IPDetailScreen
 
         profile = self.engine.get_profile(event.ip)
         if profile:
-            self.app.push_screen(IPDetailScreen(profile, self.whois, engine=self.engine))
+            self.app.push_screen(
+                IPDetailScreen(profile, self.whois, engine=self.engine)
+            )
 
     # --- Actions ---
 

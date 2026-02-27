@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
 
 from nethergaze.filters import (
     FilterState,
@@ -17,6 +16,7 @@ from nethergaze.models import Connection, IPProfile, LogEntry, TCPState
 
 
 # --- Helpers ---
+
 
 def _make_profile(
     ip: str = "1.2.3.4",
@@ -47,7 +47,9 @@ def _make_profile(
     return profile
 
 
-def _make_conn(ip: str = "1.2.3.4", state: TCPState = TCPState.ESTABLISHED) -> Connection:
+def _make_conn(
+    ip: str = "1.2.3.4", state: TCPState = TCPState.ESTABLISHED
+) -> Connection:
     return Connection(
         local_ip="0.0.0.0",
         local_port=443,
@@ -79,6 +81,7 @@ def _make_entry(
 
 # --- parse_tcp_states ---
 
+
 class TestParseTcpStates:
     def test_single(self):
         result = parse_tcp_states("SYN_RECV")
@@ -101,6 +104,7 @@ class TestParseTcpStates:
 
 
 # --- parse_status_code_spec ---
+
 
 class TestParseStatusCodeSpec:
     def test_shorthand(self):
@@ -126,6 +130,7 @@ class TestParseStatusCodeSpec:
 
 # --- parse_cidr_list ---
 
+
 class TestParseCidrList:
     def test_valid(self):
         nets = parse_cidr_list(["10.0.0.0/8", "192.168.0.0/16"])
@@ -141,6 +146,7 @@ class TestParseCidrList:
 
 # --- has_scanner_ua ---
 
+
 class TestScannerUA:
     def test_zgrab(self):
         assert has_scanner_ua("Mozilla/5.0 zgrab/0.x")
@@ -153,6 +159,7 @@ class TestScannerUA:
 
 
 # --- FilterState.matches_profile ---
+
 
 class TestFilterStateProfile:
     def test_no_filter_passes_all(self):
@@ -200,6 +207,7 @@ class TestFilterStateProfile:
 
 # --- FilterState.matches_log_entry ---
 
+
 class TestFilterStateLogEntry:
     def test_status_code_filter(self):
         f = FilterState(status_codes=[(400, 499)])
@@ -225,6 +233,7 @@ class TestFilterStateLogEntry:
 
 
 # --- Suspicious mode ---
+
 
 class TestSuspiciousMode:
     def test_syn_recv_no_requests(self):
@@ -263,6 +272,7 @@ class TestSuspiciousMode:
 
 
 # --- describe ---
+
 
 class TestDescribe:
     def test_empty(self):
