@@ -2,11 +2,12 @@
 
 Live correlate TCP connection state with HTTP requests and enrich suspicious IPs all in a terminal dashboard.
 
+[![PyPI](https://img.shields.io/pypi/v/nethergaze)](https://pypi.org/project/nethergaze/)
+[![CI](https://github.com/OuttaMyDepth/NetherGaze/actions/workflows/ci.yml/badge.svg)](https://github.com/OuttaMyDepth/NetherGaze/actions/workflows/ci.yml)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Linux](https://img.shields.io/badge/platform-linux-yellow)
 ![Textual TUI](https://img.shields.io/badge/TUI-textual-purple)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
-![GitHub last commit](https://img.shields.io/github/last-commit/OuttaMyDepth/NetherGaze)
 
 *Not a replacement for ELK or Grafana. It's a **live triage console** this tool competes with your own shell muscle memory, not big observability stacks.*
 
@@ -62,10 +63,10 @@ No telemetry, no analytics, no phoning home. The only outbound calls are whois/R
 ## Install
 
 ```bash
-pipx install git+https://github.com/OuttaMyDepth/NetherGaze.git
+pipx install nethergaze
 ```
 
-To hack on it:
+Or install from source:
 
 ```bash
 git clone https://github.com/OuttaMyDepth/NetherGaze.git
@@ -105,6 +106,9 @@ nethergaze --log-path "/var/log/caddy/access.log" --log-format json
 
 # Headless / high-traffic skip enrichment
 nethergaze --no-whois --no-geoip
+
+# Include Docker/internal IPs
+nethergaze --show-private-ips
 ```
 
 Minimal config at `~/.config/nethergaze/config.toml`:
@@ -143,7 +147,7 @@ Auto-detected per line. Override with `--log-format` if needed:
 | `c` | Copy selected IP to clipboard |
 | `b` | Show block command for selected IP (auto-detects ufw/nft/iptables) |
 | `1`, `2`, ... | Run custom action hooks on selected IP (configurable, see below) |
-| `?` | Show key bindings (includes configured hooks) |
+| `?` | Open help modal (all key bindings + configured hooks) |
 
 ## Configuration
 
