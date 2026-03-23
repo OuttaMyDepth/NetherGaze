@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -57,6 +58,26 @@ class LogEntry:
     raw_line: str = ""
 
 
+class AuthEventType(Enum):
+    """Types of auth log events."""
+
+    FAILED_PASSWORD = "failed_password"
+    INVALID_USER = "invalid_user"
+    CONNECTION_CLOSED = "connection_closed"
+    ACCEPTED_PASSWORD = "accepted_password"
+
+
+@dataclass
+class AuthEntry:
+    """A parsed auth/SSH log entry."""
+
+    remote_ip: str
+    timestamp: datetime
+    event_type: AuthEventType
+    username: str = ""
+    raw_line: str = ""
+
+
 @dataclass
 class GeoInfo:
     """GeoIP lookup result for an IP address."""
@@ -87,13 +108,24 @@ class IPProfile:
     ip: str
     connections: list[Connection] = field(default_factory=list)
     log_entries: list[LogEntry] = field(default_factory=list)
+    auth_entries: list[AuthEntry] = field(default_factory=list)
     geo: GeoInfo | None = None
     whois: WhoisInfo | None = None
     first_seen: datetime | None = None
     last_seen: datetime | None = None
     total_bytes_sent: int = 0
     total_requests: int = 0
+    total_auth_failures: int = 0
     request_rate_per_min: float = 0.0
+
+    @property
+    def services(self) -> list[int]:
+        """Unique local ports being targeted, sorted by frequency (most hit first)."""
+        port_counts = Counter(c.local_port for c in self.connections)
+        # Infer port 22 for IPs with auth entries but no SSH connection visible
+        if self.auth_entries and 22 not in port_counts:
+            port_counts[22] = len(self.auth_entries)
+        return [port for port, _ in port_counts.most_common()]
 
     @property
     def active_connections(self) -> int:

@@ -6,7 +6,7 @@ from rich.text import Text
 from textual.widgets import RichLog, Static
 from textual.app import ComposeResult
 
-from nethergaze.models import LogEntry
+from nethergaze.models import AuthEntry, AuthEventType, LogEntry
 
 
 class HttpActivityLog(Static):
@@ -41,6 +41,12 @@ class HttpActivityLog(Static):
         for entry in entries:
             log.write(_format_entry(entry))
 
+    def add_auth_entries(self, entries: list[AuthEntry]) -> None:
+        """Add auth log entries with SSH-specific styling."""
+        log = self.query_one(RichLog)
+        for entry in entries:
+            log.write(_format_auth_entry(entry))
+
     def clear_log(self) -> None:
         """Clear the log display."""
         self.query_one(RichLog).clear()
@@ -65,4 +71,23 @@ def _format_entry(entry: LogEntry) -> Text:
     text.append(f" {status} ", style=style)
     text.append(f"{entry.method:6s} ", style="bold")
     text.append(entry.path)
+    return text
+
+
+def _format_auth_entry(entry: AuthEntry) -> Text:
+    """Format an auth log entry with SSH-specific styling."""
+    text = Text()
+    text.append(entry.timestamp.strftime("%H:%M:%S"), style="dim")
+    text.append(" ")
+    text.append(entry.remote_ip.ljust(16), style="bold")
+    if entry.event_type in (
+        AuthEventType.FAILED_PASSWORD,
+        AuthEventType.INVALID_USER,
+    ):
+        text.append(f" SSH:{entry.event_type.value} ", style="red bold")
+    elif entry.event_type == AuthEventType.ACCEPTED_PASSWORD:
+        text.append(f" SSH:{entry.event_type.value} ", style="green")
+    else:
+        text.append(f" SSH:{entry.event_type.value} ", style="magenta")
+    text.append(f"user={entry.username}")
     return text

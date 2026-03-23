@@ -7,6 +7,7 @@ from nethergaze.utils import (
     parse_hex_ipv4,
     parse_hex_ipv6,
     parse_hex_port,
+    port_to_service,
 )
 
 
@@ -110,3 +111,20 @@ class TestIsPrivateIP:
 
     def test_link_local(self):
         assert is_private_ip("169.254.1.1") is True
+
+
+class TestPortToService:
+    def test_http(self):
+        assert port_to_service(80) == "http"
+
+    def test_https(self):
+        assert port_to_service(443) == "https"
+
+    def test_ssh(self):
+        assert port_to_service(22) == "ssh"
+
+    def test_unknown_returns_port_string(self):
+        assert port_to_service(9999) == "9999"
+
+    def test_mysql(self):
+        assert port_to_service(3306) == "mysql"

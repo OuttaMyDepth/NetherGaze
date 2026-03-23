@@ -60,6 +60,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Disable whois lookups",
     )
+    parser.add_argument(
+        "--auth-log-path",
+        metavar="PATH",
+        help="Path to auth.log for SSH monitoring",
+    )
+    parser.add_argument(
+        "--no-auth-log",
+        action="store_true",
+        help="Disable SSH/auth log monitoring",
+    )
     return parser.parse_args(argv)
 
 
@@ -83,6 +93,10 @@ def main(argv: list[str] | None = None) -> None:
         overrides["geoip_enabled"] = False
     if args.no_whois:
         overrides["whois_enabled"] = False
+    if args.auth_log_path:
+        overrides["auth_log_path"] = args.auth_log_path
+    if args.no_auth_log:
+        overrides["auth_log_enabled"] = False
 
     config = AppConfig.load(config_path=args.config, cli_overrides=overrides)
 

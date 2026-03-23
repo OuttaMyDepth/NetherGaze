@@ -10,8 +10,9 @@ from textual.widgets import Button, DataTable, RichLog, Static
 
 from nethergaze.correlation import CorrelationEngine
 from nethergaze.enrichment.whois_lookup import WhoisLookupService
-from nethergaze.models import IPProfile
-from nethergaze.utils import format_bytes
+from nethergaze.models import AuthEventType, IPProfile
+from nethergaze.persistence import HistoryDB
+from nethergaze.utils import format_bytes, port_to_service
 
 
 class IPDetailScreen(ModalScreen[None]):
@@ -50,6 +51,14 @@ class IPDetailScreen(ModalScreen[None]):
         height: 10;
         margin-bottom: 1;
     }
+    #detail-history {
+        margin-bottom: 1;
+        color: $text-muted;
+    }
+    #detail-auth {
+        height: 8;
+        margin-bottom: 1;
+    }
     #detail-requests {
         height: 12;
     }
@@ -64,11 +73,15 @@ class IPDetailScreen(ModalScreen[None]):
         profile: IPProfile,
         whois_service: WhoisLookupService | None = None,
         engine: CorrelationEngine | None = None,
+        filter_state=None,
+        history_db: HistoryDB | None = None,
     ) -> None:
         super().__init__()
         self.profile = profile
         self.whois_service = whois_service
         self._engine = engine
+        self._filter_state = filter_state
+        self._history_db = history_db
         self._last_log_count = len(profile.log_entries)
 
     def compose(self) -> ComposeResult:
@@ -77,7 +90,9 @@ class IPDetailScreen(ModalScreen[None]):
             yield Static(self._geo_text(), id="detail-geo")
             yield Static(self._whois_text(), id="detail-whois")
             yield Static(self._stats_text(), id="detail-stats")
+            yield Static(self._history_text(), id="detail-history")
             yield self._build_connections_table()
+            yield self._build_auth_log()
             yield self._build_request_log()
             yield Button("Close [Esc]", id="close-btn", variant="primary")
 
@@ -102,11 +117,29 @@ class IPDetailScreen(ModalScreen[None]):
         p = self.profile
         first = p.first_seen.strftime("%H:%M:%S") if p.first_seen else "?"
         last = p.last_seen.strftime("%H:%M:%S") if p.last_seen else "?"
-        return (
+        services = p.services
+        svc_names = ", ".join(f"{port_to_service(pt)}({pt})" for pt in services[:6])
+        auth_info = (
+            f" | Auth failures: {p.total_auth_failures}"
+            if p.total_auth_failures > 0
+            else ""
+        )
+        text = (
             f"Connections: {len(p.connections)} ({p.active_connections} established)\n"
-            f"Requests: {p.total_requests} | Sent: {format_bytes(p.total_bytes_sent)}\n"
+            f"Requests: {p.total_requests} | Sent: {format_bytes(p.total_bytes_sent)}{auth_info}\n"
+            f"Services: {svc_names or 'none'}\n"
             f"First seen: {first} | Last seen: {last}"
         )
+        if self._filter_state:
+            reasons = self._filter_state.suspicious_reasons(p)
+            if reasons:
+                text += f"\nSuspicious: {', '.join(reasons)}"
+        return text
+
+    def _history_text(self) -> str:
+        if not self._history_db:
+            return ""
+        return self._history_db.format_history_line(self.profile.ip)
 
     def _build_connections_table(self) -> DataTable:
         table = DataTable(id="detail-connections", cursor_type="row")
@@ -120,6 +153,26 @@ class IPDetailScreen(ModalScreen[None]):
                 conn.process_name or "?",
             )
         return table
+
+    def _build_auth_log(self) -> RichLog:
+        log = RichLog(id="detail-auth", max_lines=50, wrap=False, markup=False)
+        if not self.profile.auth_entries:
+            return log
+        for entry in self.profile.auth_entries[-30:]:
+            text = Text()
+            text.append(entry.timestamp.strftime("%H:%M:%S"), style="dim")
+            if entry.event_type in (
+                AuthEventType.FAILED_PASSWORD,
+                AuthEventType.INVALID_USER,
+            ):
+                text.append(f" {entry.event_type.value} ", style="red bold")
+            elif entry.event_type == AuthEventType.ACCEPTED_PASSWORD:
+                text.append(f" {entry.event_type.value} ", style="green")
+            else:
+                text.append(f" {entry.event_type.value} ", style="magenta")
+            text.append(f"user={entry.username}")
+            log.write(text)
+        return log
 
     def _build_request_log(self) -> RichLog:
         log = RichLog(id="detail-requests", max_lines=100, wrap=False, markup=False)

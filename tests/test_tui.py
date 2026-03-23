@@ -92,6 +92,10 @@ class TestKeyBindings:
             await pilot.press("s")
             assert table._sort_key == "bytes"
             await pilot.press("s")
+            assert table._sort_key == "auth"
+            await pilot.press("s")
+            assert table._sort_key == "svc"
+            await pilot.press("s")
             assert table._sort_key == "ip"
             await pilot.press("s")
             assert table._sort_key == "conns"

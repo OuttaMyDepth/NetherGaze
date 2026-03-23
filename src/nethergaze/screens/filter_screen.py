@@ -130,6 +130,8 @@ class FilterScreen(ModalScreen[FilterState | None]):
                     suspicious_burst_rpm=self._current.suspicious_burst_rpm,
                     suspicious_min_conns=self._current.suspicious_min_conns,
                     extra_scanner_patterns=self._current.extra_scanner_patterns,
+                    extra_exploit_patterns=self._current.extra_exploit_patterns,
+                    suspicious_min_auth_failures=self._current.suspicious_min_auth_failures,
                 )
             )
         elif event.button.id == "cancel":
@@ -154,5 +156,7 @@ class FilterScreen(ModalScreen[FilterState | None]):
             suspicious_burst_rpm=self._current.suspicious_burst_rpm,
             suspicious_min_conns=self._current.suspicious_min_conns,
             extra_scanner_patterns=self._current.extra_scanner_patterns,
+            extra_exploit_patterns=self._current.extra_exploit_patterns,
+            suspicious_min_auth_failures=self._current.suspicious_min_auth_failures,
         )
         self.dismiss(new_filter)

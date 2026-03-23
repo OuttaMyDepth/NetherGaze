@@ -45,6 +45,12 @@ class AppConfig:
     suspicious_burst_rpm: float = 60.0
     suspicious_min_conns: int = 5
     scanner_user_agents: list[str] = field(default_factory=list)
+    exploit_path_patterns: list[str] = field(default_factory=list)
+
+    # Auth log
+    auth_log_path: str = "/var/log/auth.log"
+    auth_log_enabled: bool = True
+    auth_log_interval: float = 2.0
 
     # Actions
     enable_block_execution: bool = False
@@ -104,16 +110,27 @@ def _apply_toml(config: AppConfig, data: dict) -> None:
     """Apply TOML data to config."""
     section_map = {
         "log": ["log_path", "log_format", "max_log_lines", "max_log_entries_per_ip"],
-        "refresh": ["connections_interval", "log_interval", "bandwidth_interval"],
+        "refresh": [
+            "connections_interval",
+            "log_interval",
+            "bandwidth_interval",
+            "auth_log_interval",
+        ],
         "geoip": ["geoip_enabled", "geoip_city_db", "geoip_asn_db"],
         "whois": ["whois_enabled", "whois_cache_ttl", "whois_max_workers"],
+        "auth": ["auth_log_path", "auth_log_enabled", "auth_log_interval"],
         "cache": ["cache_dir"],
     }
 
     # Handle [filters] section
     if "filters" in data:
         filt = data["filters"]
-        for key in ("cidr_allow", "cidr_deny", "scanner_user_agents"):
+        for key in (
+            "cidr_allow",
+            "cidr_deny",
+            "scanner_user_agents",
+            "exploit_path_patterns",
+        ):
             if key in filt:
                 setattr(config, key, filt[key])
         if "suspicious_burst_rpm" in filt:

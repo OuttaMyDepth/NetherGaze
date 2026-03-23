@@ -6,11 +6,13 @@ from pathlib import Path
 
 from textual.app import App
 
+from nethergaze.collectors.auth import AuthLogWatcher
 from nethergaze.collectors.logs import LogWatcher, MultiLogWatcher
 from nethergaze.config import AppConfig
 from nethergaze.correlation import CorrelationEngine
 from nethergaze.enrichment.geoip import GeoIPLookup
 from nethergaze.enrichment.whois_lookup import WhoisLookupService
+from nethergaze.persistence import HistoryDB
 from nethergaze.screens.dashboard import DashboardScreen
 
 
@@ -58,6 +60,15 @@ class NethergazeApp(App):
             if not self.whois.available:
                 self.whois = None
 
+        self.history_db = HistoryDB(Path(config.cache_dir) / "history.db")
+
+        self.auth_watcher: AuthLogWatcher | None = None
+        if config.auth_log_enabled and Path(config.auth_log_path).exists():
+            self.auth_watcher = AuthLogWatcher(
+                config.auth_log_path,
+                max_entries_per_ip=config.max_log_entries_per_ip,
+            )
+
         self.log_watcher: LogWatcher | MultiLogWatcher | None = None
         if config.log_path:
             if any(c in config.log_path for c in "*?["):
@@ -81,6 +92,8 @@ class NethergazeApp(App):
                 geoip=self.geoip,
                 whois=self.whois,
                 log_watcher=self.log_watcher,
+                history_db=self.history_db,
+                auth_watcher=self.auth_watcher,
             )
         )
 
@@ -124,10 +137,14 @@ class NethergazeApp(App):
     def _shutdown_services(self) -> None:
         if self.log_watcher:
             self.log_watcher.close()
+        if self.auth_watcher:
+            self.auth_watcher.close()
         if self.whois:
             self.whois.shutdown()
         if self.geoip:
             self.geoip.close()
+        if self.history_db:
+            self.history_db.close()
 
     def on_unmount(self) -> None:
         self._shutdown_services()

@@ -16,12 +16,16 @@ Live correlate TCP connection state with HTTP requests and enrich suspicious IPs
 > **What you're seeing:** The left panel correlates each IP's TCP connections with its HTTP requests, country, org, connection count, and bytes all in a single view. The right panel streams color coded access log entries in real time. The top bar surfaces the highest traffic IPs at a glance. An IP with 10 connections but zero requests? That's whack suspicious. An IP hammering `/wp-login.php` at 200 req/min? You'll see it instantly and can quickly block without needing to leave the tool or your chair.
 
 - **Top offenders bar** — Real time req/s, new connections/s, and top 3 IPs by request rate and connection count
-- **IP drill-down**  Press Enter on any IP for live-updating detail: connections, recent requests, whois info — all refresh while the modal is open
-- **Suspicious mode**  One key toggle to surface SYN floods, scanners, and burst traffic
-- **Structured filters**  Filter by TCP state, status codes, request rate, CIDR ranges, or free text  applied to both panels
-- **Block assist**  Auto detect your firewall (ufw/nft/iptables) and generate or execute block commands from the TUI
-- **Custom action hooks**  Define your own keybindings that run shell commands on the selected IP (`dig -x {ip}`, `ping -c 3 {ip}`, anything you want)
-- **Auto-enrichment**  GeoIP and whois/RDAP lookups run in background threads for every new IP
+- **IP drill-down** — Press Enter on any IP for live-updating detail: connections, recent requests, whois info — all refresh while the modal is open
+- **Service/port visibility** — See which services (http, https, ssh, mysql, etc.) each IP is hitting at a glance in the main table and detail view
+- **Suspicious mode** — One key toggle to surface SYN floods, scanners, burst traffic, exploit probes, and SSH brute-force attempts
+- **Exploit path detection** — Automatically flags IPs probing for `.env`, `wp-login.php`, Log4j JNDI strings, path traversal, `.git` exposure, phpMyAdmin, and more
+- **SSH/auth log monitoring** — Parses `/var/log/auth.log` in real time. Failed password attempts, invalid users, and brute-force bots show up alongside HTTP traffic in the same correlated view
+- **Historical persistence** — SQLite database tracks IPs across sessions. See how many times an IP has appeared, its lifetime request total, and whether it was previously flagged as suspicious
+- **Structured filters** — Filter by TCP state, status codes, request rate, CIDR ranges, or free text — applied to both panels
+- **Block assist** — Auto detect your firewall (ufw/nft/iptables) and generate or execute block commands from the TUI
+- **Custom action hooks** — Define your own keybindings that run shell commands on the selected IP (`dig -x {ip}`, `ping -c 3 {ip}`, anything you want)
+- **Auto-enrichment** — GeoIP and whois/RDAP lookups run in background threads for every new IP
 
 ## Why It Matters
 
@@ -44,9 +48,10 @@ Pressing `!` to toggle suspicious mode instantly filtered the view down to only 
 ```
 /proc/net/tcp (1s poll) -->                  --> Connections Table
 HTTP access logs (0.5s) --> Correlation      --> HTTP Activity Log
-vnstat (30s)            -->   Engine         --> Top Offenders Bar
-whois/RDAP (async)      --> (IPProfile dict) --> Header / Stats Bar
-GeoIP (sync, cached)    -->                  --> Filter Engine
+auth.log (2s poll)      -->   Engine         --> Top Offenders Bar
+vnstat (30s)            --> (IPProfile dict) --> Header / Stats Bar
+whois/RDAP (async)      -->                  --> Filter Engine
+GeoIP (sync, cached)    -->                  --> SQLite History DB
 ```
 
 **What makes it fast:** Nethergaze runs on the same box it monitors without adding load.
@@ -55,8 +60,11 @@ GeoIP (sync, cached)    -->                  --> Filter Engine
 - **Log tailing**  Inode-based rotation detection, seek to end on first open (only tails new lines, never replays the full file). Glob patterns tail all vhost logs simultaneously with automatic discovery of new log files every 30 seconds.
 - **GeoIP**  Sync lookups against local MMDB files, memory cached. No network calls. ~0.1ms per lookup.
 - **Whois/RDAP** Async in a capped thread pool (3 workers). RDAP first, legacy whois fallback, 10s timeouts, disk-cached 24h. Failed lookups retry on next encounter.
-- **Per-IP rate tracking** —Rolling 60 second window powers filters, suspicious mode, and the top offenders bar.
-- **Enrichment off**  `--no-whois --no-geoip` disables all outbound calls for high traffic environments.
+- **Auth log tailing** — Same rotation-aware tailer for `/var/log/auth.log`. SSH failures correlate with the same IP profiles as HTTP traffic.
+- **Per-IP rate tracking** — Rolling 60 second window powers filters, suspicious mode, and the top offenders bar.
+- **Historical persistence** — SQLite with WAL mode. Periodic 60s snapshots plus graceful shutdown writes. Negligible overhead.
+- **Exploit detection** — Compiled regex patterns checked against only the last 20 log entries per IP. Fast even under high request volume.
+- **Enrichment off** — `--no-whois --no-geoip` disables all outbound calls for high traffic environments.
 
 No telemetry, no analytics, no phoning home. The only outbound calls are whois/RDAP lookups for IP enrichment, and those are opt-out with `--no-whois`.
 
@@ -107,6 +115,12 @@ nethergaze --log-path "/var/log/caddy/access.log" --log-format json
 # Headless / high-traffic skip enrichment
 nethergaze --no-whois --no-geoip
 
+# Custom auth log path
+nethergaze --auth-log-path /var/log/secure
+
+# Disable SSH monitoring
+nethergaze --no-auth-log
+
 # Include Docker/internal IPs
 nethergaze --show-private-ips
 ```
@@ -138,7 +152,7 @@ Auto-detected per line. Override with `--log-format` if needed:
 | `q` | Quit |
 | `Tab` / `Shift+Tab` | Switch panel focus |
 | `Enter` | Drill down into selected IP |
-| `s` | Cycle sort column (connections / requests / bytes / IP) |
+| `s` | Cycle sort column (connections / requests / bytes / auth / services / IP) |
 | `w` | Trigger whois lookup for selected IP |
 | `r` | Force refresh all data |
 | `/` | Quick text filter (Enter to apply, Escape to dismiss) |
@@ -165,6 +179,7 @@ show_private_ips = false # Filter Docker/internal IPs from display
 connections_interval = 1.0   # /proc/net/tcp poll (seconds)
 log_interval = 0.5           # Log tail poll
 bandwidth_interval = 30.0    # vnstat poll
+auth_log_interval = 2.0      # Auth log poll
 
 [geoip]
 enabled = true
@@ -183,6 +198,12 @@ max_workers = 3     # Max concurrent lookups
 suspicious_burst_rpm = 60      # Req/min threshold for burst detection
 suspicious_min_conns = 5       # Min connections for "high conns + low reqs" pattern
 # scanner_user_agents = ["custom-bot"]   # Extra scanner UA patterns
+# exploit_path_patterns = ["custom-path-regex"]  # Extra exploit path regexes
+
+[auth]
+enabled = true
+path = "/var/log/auth.log"     # Path to SSH/auth log
+# interval = 2.0              # Poll interval (seconds)
 
 [actions]
 enable_block_execution = false  # Allow executing block commands (requires sudo)
@@ -211,7 +232,7 @@ Resolution order: CLI flags > environment variables (`NETHERGAZE_*`) > config fi
 | Remote IP address | Legacy whois servers (port 43) | TCP | `--no-whois` |
 | None (local file reads) | GeoIP MMDB on disk | N/A | `--no-geoip` |
 
-Whois cache is stored locally at `~/.cache/nethergaze/whois_cache.json`. GeoIP results are memory-only (not persisted).
+Whois cache is stored locally at `~/.cache/nethergaze/whois_cache.json`. GeoIP results are memory-only (not persisted). Historical IP data is stored in `~/.cache/nethergaze/history.db` (SQLite).
 
 ## Requirements
 
@@ -220,6 +241,7 @@ Whois cache is stored locally at `~/.cache/nethergaze/whois_cache.json`. GeoIP r
 - HTTP server with combined, common, or JSON log format (nginx, Apache, Caddy)
 - Optional: `vnstat` for bandwidth stats
 - Optional: MMDB GeoIP databases (DB-IP Lite or MaxMind GeoLite2) for country/city/ASN
+- Optional: `/var/log/auth.log` readable for SSH brute-force monitoring (auto-detected)
 
 ## License
 

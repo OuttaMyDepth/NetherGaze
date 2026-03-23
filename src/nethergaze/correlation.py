@@ -8,6 +8,8 @@ from datetime import datetime
 
 from nethergaze.models import (
     AggregateStats,
+    AuthEntry,
+    AuthEventType,
     BandwidthStats,
     Connection,
     GeoInfo,
@@ -92,6 +94,23 @@ class CorrelationEngine:
                 if not ts_list:
                     del self._ip_request_timestamps[ip]
 
+    def update_auth_entries(self, entries: list[AuthEntry]) -> None:
+        """Add new auth log entries to the appropriate IP profiles."""
+        with self._lock:
+            for entry in entries:
+                ip = entry.remote_ip
+                profile = self._profiles.setdefault(ip, IPProfile(ip=ip))
+                profile.auth_entries.append(entry)
+                if entry.event_type in (
+                    AuthEventType.FAILED_PASSWORD,
+                    AuthEventType.INVALID_USER,
+                ):
+                    profile.total_auth_failures += 1
+                ts = entry.timestamp
+                if profile.first_seen is None:
+                    profile.first_seen = ts
+                profile.last_seen = ts
+
     def update_geo(self, ip: str, geo: GeoInfo) -> None:
         """Update GeoIP data for an IP."""
         with self._lock:
@@ -115,7 +134,7 @@ class CorrelationEngine:
             profiles = [
                 p
                 for p in self._profiles.values()
-                if p.connections or p.total_requests > 0
+                if p.connections or p.total_requests > 0 or p.total_auth_failures > 0
             ]
             # Compute per-IP request rates
             for p in profiles:
@@ -144,7 +163,9 @@ class CorrelationEngine:
             sum(1 for c in p.connections if c.state == TCPState.ESTABLISHED)
             for p in profiles
         )
-        unique_ips = len([p for p in profiles if p.connections or p.log_entries])
+        unique_ips = len(
+            [p for p in profiles if p.connections or p.log_entries or p.auth_entries]
+        )
         total_requests = sum(p.total_requests for p in profiles)
         total_bytes = sum(p.total_bytes_sent for p in profiles)
 
@@ -166,7 +187,7 @@ class CorrelationEngine:
             profiles = [
                 p
                 for p in self._profiles.values()
-                if p.connections or p.total_requests > 0
+                if p.connections or p.total_requests > 0 or p.total_auth_failures > 0
             ]
             # Per-IP rates
             ip_rates = {
@@ -200,19 +221,29 @@ class CorrelationEngine:
     def trim_stale_profiles(self, max_age_seconds: int = 120) -> None:
         """Remove profiles with no connections and no recent activity."""
         cutoff = datetime.now().astimezone()
+        # Auth-only profiles (no connections, no HTTP) age out faster
+        auth_only_max_age = min(max_age_seconds, 30)
         with self._lock:
             to_remove = []
             for ip, profile in self._profiles.items():
                 if profile.connections:
                     continue
-                if profile.total_requests == 0 and not profile.connections:
-                    to_remove.append(ip)
-                    continue
                 if (
-                    profile.last_seen
-                    and (cutoff - profile.last_seen).total_seconds() > max_age_seconds
+                    profile.total_requests == 0
+                    and profile.total_auth_failures == 0
+                    and not profile.connections
                 ):
                     to_remove.append(ip)
+                    continue
+                if profile.last_seen:
+                    age = (cutoff - profile.last_seen).total_seconds()
+                    # Auth-only profiles get shorter TTL
+                    is_auth_only = (
+                        profile.total_auth_failures > 0 and profile.total_requests == 0
+                    )
+                    threshold = auth_only_max_age if is_auth_only else max_age_seconds
+                    if age > threshold:
+                        to_remove.append(ip)
             for ip in to_remove:
                 del self._profiles[ip]
                 self._known_conn_ips.discard(ip)

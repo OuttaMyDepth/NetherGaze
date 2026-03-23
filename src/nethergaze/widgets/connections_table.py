@@ -7,7 +7,7 @@ from textual.message import Message
 from textual.widgets import DataTable, Static
 
 from nethergaze.models import IPProfile
-from nethergaze.utils import format_bytes
+from nethergaze.utils import format_bytes, port_to_service
 
 # Column definitions: (key, label, width)
 COLUMNS = [
@@ -16,12 +16,15 @@ COLUMNS = [
     ("org", "Organization", 24),
     ("conns", "Conns", 6),
     ("state", "State", 6),
+    ("svc", "Svc", 12),
     ("reqs", "Reqs", 6),
     ("bytes", "Bytes", 10),
+    ("auth", "Auth", 5),
+    ("hx", "Hx", 4),
     ("last_path", "Last Path", 30),
 ]
 
-SORT_KEYS = ["conns", "reqs", "bytes", "ip"]
+SORT_KEYS = ["conns", "reqs", "bytes", "auth", "svc", "ip"]
 
 
 class ConnectionsTable(Static):
@@ -70,9 +73,13 @@ class ConnectionsTable(Static):
         self._sort_reverse = self._sort_key != "ip"
         self.update_data(self._profiles)
 
-    def update_data(self, profiles: list[IPProfile]) -> None:
+    def update_data(
+        self, profiles: list[IPProfile], filter_state=None, history_db=None
+    ) -> None:
         """Replace all table data with new profiles."""
         self._profiles = profiles
+        self._filter_state = filter_state
+        self._history_db = history_db
         table = self.query_one(DataTable)
 
         # Sort profiles
@@ -99,14 +106,42 @@ class ConnectionsTable(Static):
                 last = profile.log_entries[-1]
                 last_path = f"{last.method} {last.path}"
 
+            services = profile.services
+            svc_str = ",".join(port_to_service(p) for p in services[:3])
+            if len(services) > 3:
+                svc_str += f"+{len(services) - 3}"
+
+            ip_display = profile.ip
+            if (
+                filter_state
+                and filter_state.suspicious_mode
+                and filter_state._is_suspicious(profile)
+            ):
+                ip_display = profile.ip + " !"
+
+            hx = "-"
+            if history_db:
+                count = history_db.get_session_count(profile.ip)
+                if count > 1:
+                    hx = f"{count}x"
+
+            auth_str = (
+                str(profile.total_auth_failures)
+                if profile.total_auth_failures > 0
+                else "-"
+            )
+
             table.add_row(
-                profile.ip,
+                ip_display,
                 profile.country_code,
                 _truncate(profile.as_org, 24),
                 str(total_conns),
                 f"{active}E" if active else "-",
+                _truncate(svc_str, 12) if svc_str else "-",
                 str(profile.total_requests),
                 format_bytes(profile.total_bytes_sent),
+                auth_str,
+                hx,
                 _truncate(last_path, 30),
                 key=profile.ip,
             )
@@ -129,6 +164,11 @@ def _sort_value(profile: IPProfile, key: str):
         return profile.total_requests
     elif key == "bytes":
         return profile.total_bytes_sent
+    elif key == "auth":
+        return profile.total_auth_failures
+    elif key == "svc":
+        services = profile.services
+        return (len(services), services[0] if services else 0)
     elif key == "ip":
         return profile.ip
     return 0

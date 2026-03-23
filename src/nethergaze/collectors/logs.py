@@ -104,7 +104,10 @@ class LogWatcher:
                 return []
 
         new_entries: list[LogEntry] = []
-        for line in self._file:
+        while True:
+            line = self._file.readline()
+            if not line:
+                break
             line = line.rstrip("\n")
             if not line:
                 continue

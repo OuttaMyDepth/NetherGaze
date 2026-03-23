@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 from nethergaze.correlation import CorrelationEngine
 from nethergaze.models import (
+    AuthEntry,
+    AuthEventType,
     BandwidthStats,
     Connection,
     GeoInfo,
@@ -142,3 +144,86 @@ class TestCorrelationEngine:
     def test_get_nonexistent_profile(self):
         engine = CorrelationEngine()
         assert engine.get_profile("9.9.9.9") is None
+
+
+class TestIPProfileServices:
+    def test_services_sorted_by_frequency(self):
+        from nethergaze.models import IPProfile
+
+        profile = IPProfile(
+            ip="1.2.3.4",
+            connections=[
+                _make_connection("1.2.3.4"),  # port 80
+                _make_connection("1.2.3.4"),  # port 80
+                Connection(
+                    local_ip="0.0.0.0",
+                    local_port=443,
+                    remote_ip="1.2.3.4",
+                    remote_port=12345,
+                    state=TCPState.ESTABLISHED,
+                    inode=1000,
+                ),
+            ],
+        )
+        assert profile.services == [80, 443]
+
+    def test_services_empty_no_connections(self):
+        from nethergaze.models import IPProfile
+
+        profile = IPProfile(ip="1.2.3.4")
+        assert profile.services == []
+
+
+class TestAuthEntries:
+    def test_update_auth_entries(self):
+        engine = CorrelationEngine()
+        entries = [
+            AuthEntry(
+                remote_ip="1.2.3.4",
+                timestamp=datetime.now(timezone.utc),
+                event_type=AuthEventType.FAILED_PASSWORD,
+                username="root",
+            ),
+            AuthEntry(
+                remote_ip="1.2.3.4",
+                timestamp=datetime.now(timezone.utc),
+                event_type=AuthEventType.INVALID_USER,
+                username="test",
+            ),
+        ]
+        engine.update_auth_entries(entries)
+        p = engine.get_profile("1.2.3.4")
+        assert p is not None
+        assert p.total_auth_failures == 2
+        assert len(p.auth_entries) == 2
+
+    def test_accepted_does_not_count_as_failure(self):
+        engine = CorrelationEngine()
+        entries = [
+            AuthEntry(
+                remote_ip="10.0.0.1",
+                timestamp=datetime.now(timezone.utc),
+                event_type=AuthEventType.ACCEPTED_PASSWORD,
+                username="ubuntu",
+            ),
+        ]
+        engine.update_auth_entries(entries)
+        p = engine.get_profile("10.0.0.1")
+        assert p.total_auth_failures == 0
+        assert len(p.auth_entries) == 1
+
+    def test_auth_entries_set_first_last_seen(self):
+        engine = CorrelationEngine()
+        ts = datetime.now(timezone.utc)
+        entries = [
+            AuthEntry(
+                remote_ip="1.2.3.4",
+                timestamp=ts,
+                event_type=AuthEventType.FAILED_PASSWORD,
+                username="root",
+            ),
+        ]
+        engine.update_auth_entries(entries)
+        p = engine.get_profile("1.2.3.4")
+        assert p.first_seen == ts
+        assert p.last_seen == ts

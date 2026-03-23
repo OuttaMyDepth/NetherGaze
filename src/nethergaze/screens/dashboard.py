@@ -7,6 +7,7 @@ from textual.containers import Horizontal
 from textual.screen import Screen
 from textual.widgets import Footer, Input
 
+from nethergaze.collectors.auth import AuthLogWatcher
 from nethergaze.collectors.bandwidth import get_bandwidth
 from nethergaze.collectors.connections import get_connections
 from nethergaze.collectors.logs import LogWatcher, MultiLogWatcher
@@ -16,6 +17,7 @@ from nethergaze.enrichment.geoip import GeoIPLookup
 from nethergaze.enrichment.whois_lookup import WhoisLookupService
 from nethergaze.filters import FilterState, parse_cidr_list
 from nethergaze.models import ActionHook
+from nethergaze.persistence import HistoryDB
 from nethergaze.utils import is_private_ip
 from nethergaze.widgets.connections_table import ConnectionsTable
 from nethergaze.widgets.header_bar import HeaderBar
@@ -34,6 +36,8 @@ class DashboardScreen(Screen):
         geoip: GeoIPLookup | None,
         whois: WhoisLookupService | None,
         log_watcher: LogWatcher | MultiLogWatcher | None,
+        history_db: HistoryDB | None = None,
+        auth_watcher: AuthLogWatcher | None = None,
     ) -> None:
         super().__init__()
         self.config = config
@@ -41,6 +45,8 @@ class DashboardScreen(Screen):
         self.geoip = geoip
         self.whois = whois
         self.log_watcher = log_watcher
+        self.history_db = history_db
+        self.auth_watcher = auth_watcher
 
         # Initialize filter state with config-based CIDR lists
         self._filters = FilterState(
@@ -49,6 +55,7 @@ class DashboardScreen(Screen):
             suspicious_burst_rpm=config.suspicious_burst_rpm,
             suspicious_min_conns=config.suspicious_min_conns,
             extra_scanner_patterns=config.scanner_user_agents,
+            extra_exploit_patterns=config.exploit_path_patterns,
         )
         self._pre_suspicious_filters: FilterState | None = None
 
@@ -93,6 +100,12 @@ class DashboardScreen(Screen):
         # Rescan for new log files every 30s (only relevant for glob-based MultiLogWatcher)
         if isinstance(self.log_watcher, MultiLogWatcher):
             self.set_interval(30.0, self.log_watcher.rescan)
+        # Auth log polling
+        if self.auth_watcher:
+            self.set_interval(self.config.auth_log_interval, self._poll_auth)
+        # Periodic history snapshots
+        if self.history_db:
+            self.set_interval(60.0, self._snapshot_profiles)
         # Initial bandwidth check
         self._poll_bandwidth()
 
@@ -197,6 +210,33 @@ class DashboardScreen(Screen):
 
         self.run_worker(_work, thread=True, exclusive=True, group="bandwidth")
 
+    def _poll_auth(self) -> None:
+        if not self.auth_watcher:
+            return
+
+        def _work() -> None:
+            entries = self.auth_watcher.poll()
+            if not entries:
+                return
+            if not self.config.show_private_ips:
+                entries = [e for e in entries if not is_private_ip(e.remote_ip)]
+            if not entries:
+                return
+            self.engine.update_auth_entries(entries)
+            seen = set()
+            for entry in entries:
+                if entry.remote_ip not in seen:
+                    seen.add(entry.remote_ip)
+                    self._enrich_ip(entry.remote_ip)
+            self.app.call_from_thread(self._on_new_auth_entries, entries)
+
+        self.run_worker(_work, thread=True, exclusive=True, group="auth")
+
+    def _on_new_auth_entries(self, entries) -> None:
+        """Display auth entries in the log widget and refresh table."""
+        self._log.add_auth_entries(entries)
+        self._refresh_table()
+
     # --- UI refresh (main thread) ---
 
     def _refresh_table(self) -> None:
@@ -206,7 +246,9 @@ class DashboardScreen(Screen):
         if self._filters.is_active:
             profiles = [p for p in profiles if self._filters.matches_profile(p)]
 
-        self._table.update_data(profiles)
+        self._table.update_data(
+            profiles, filter_state=self._filters, history_db=self.history_db
+        )
 
         stats = self.engine.get_aggregate_stats()
         self._stats.update_stats(stats, self._filters)
@@ -237,7 +279,13 @@ class DashboardScreen(Screen):
         profile = self.engine.get_profile(event.ip)
         if profile:
             self.app.push_screen(
-                IPDetailScreen(profile, self.whois, engine=self.engine)
+                IPDetailScreen(
+                    profile,
+                    self.whois,
+                    engine=self.engine,
+                    filter_state=self._filters,
+                    history_db=self.history_db,
+                )
             )
 
     # --- Actions ---
@@ -322,6 +370,8 @@ class DashboardScreen(Screen):
                 suspicious_burst_rpm=self._filters.suspicious_burst_rpm,
                 suspicious_min_conns=self._filters.suspicious_min_conns,
                 extra_scanner_patterns=self._filters.extra_scanner_patterns,
+                extra_exploit_patterns=self._filters.extra_exploit_patterns,
+                suspicious_min_auth_failures=self._filters.suspicious_min_auth_failures,
             )
             self._filters = FilterState(
                 suspicious_mode=True,
@@ -330,6 +380,8 @@ class DashboardScreen(Screen):
                 suspicious_burst_rpm=self._filters.suspicious_burst_rpm,
                 suspicious_min_conns=self._filters.suspicious_min_conns,
                 extra_scanner_patterns=self._filters.extra_scanner_patterns,
+                extra_exploit_patterns=self._filters.extra_exploit_patterns,
+                suspicious_min_auth_failures=self._filters.suspicious_min_auth_failures,
             )
             self.notify("Suspicious mode ON")
         self._refresh_table()
@@ -386,6 +438,18 @@ class DashboardScreen(Screen):
     def action_hooks(self) -> list[ActionHook]:
         """Expose configured hooks for help text generation."""
         return self._action_hooks
+
+    def _snapshot_profiles(self) -> None:
+        """Save active profiles to historical database."""
+        if not self.history_db:
+            return
+        profiles = self.engine.get_profiles()
+        for profile in profiles:
+            if self.history_db.is_new_to_session(profile.ip):
+                is_sus = self._filters._is_suspicious(profile)
+                self.history_db.record_session(profile, is_suspicious=is_sus)
+            else:
+                self.history_db.update_in_session(profile)
 
     def _trim_stale(self) -> None:
         self.engine.trim_stale_profiles(max_age_seconds=300)

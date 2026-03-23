@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 from dataclasses import dataclass, field
 
 from nethergaze.models import IPProfile, LogEntry, TCPState
@@ -22,6 +23,28 @@ SCANNER_PATTERNS = [
     "censys",
     "shodan",
 ]
+
+
+# Known exploit/probe path patterns (compiled regexes)
+EXPLOIT_PATH_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\.env\b", re.IGNORECASE),
+    re.compile(r"wp-login\.php", re.IGNORECASE),
+    re.compile(r"wp-admin", re.IGNORECASE),
+    re.compile(r"\$\{jndi:", re.IGNORECASE),
+    re.compile(r"\.\./"),
+    re.compile(r"/etc/passwd", re.IGNORECASE),
+    re.compile(r"/phpMyAdmin", re.IGNORECASE),
+    re.compile(r"/\.git", re.IGNORECASE),
+    re.compile(r"/cgi-bin/", re.IGNORECASE),
+    re.compile(r"/shell\b", re.IGNORECASE),
+    re.compile(r"\.(asp|aspx|jsp|cgi)\b", re.IGNORECASE),
+]
+
+
+def has_exploit_path(path: str, extra_patterns: list[re.Pattern] | None = None) -> bool:
+    """Check if a request path matches known exploit/probe patterns."""
+    patterns = EXPLOIT_PATH_PATTERNS + (extra_patterns or [])
+    return any(p.search(path) for p in patterns)
 
 
 def has_scanner_ua(user_agent: str) -> bool:
@@ -133,6 +156,8 @@ class FilterState:
     suspicious_burst_rpm: float = 60.0
     suspicious_min_conns: int = 5
     extra_scanner_patterns: list[str] = field(default_factory=list)
+    extra_exploit_patterns: list[str] = field(default_factory=list)
+    suspicious_min_auth_failures: int = 3
 
     @property
     def is_active(self) -> bool:
@@ -206,7 +231,51 @@ class FilterState:
             ua = profile.log_entries[-1].user_agent
             if ua and _has_any_scanner_ua(ua, self.extra_scanner_patterns):
                 return True
+        # Exploit path patterns in requests
+        if self._has_exploit_paths(profile):
+            return True
+        # Auth brute force
+        if profile.total_auth_failures >= self.suspicious_min_auth_failures:
+            return True
         return False
+
+    def _has_exploit_paths(self, profile: IPProfile) -> bool:
+        """Check if any recent log entry has exploit-pattern paths."""
+        if not profile.log_entries:
+            return False
+        extra = (
+            [re.compile(p, re.IGNORECASE) for p in self.extra_exploit_patterns]
+            if self.extra_exploit_patterns
+            else None
+        )
+        recent = profile.log_entries[-20:]
+        return any(has_exploit_path(e.path, extra) for e in recent)
+
+    def suspicious_reasons(self, profile: IPProfile) -> list[str]:
+        """Return list of human-readable reasons why this profile is suspicious."""
+        reasons: list[str] = []
+        if profile.total_requests == 0 and any(
+            c.state == TCPState.SYN_RECV for c in profile.connections
+        ):
+            reasons.append("SYN_RECV with no requests")
+        if (
+            len(profile.connections) >= self.suspicious_min_conns
+            and profile.total_requests <= 1
+        ):
+            reasons.append(
+                f"{len(profile.connections)} conns, {profile.total_requests} reqs"
+            )
+        if profile.request_rate_per_min > self.suspicious_burst_rpm:
+            reasons.append(f"burst {profile.request_rate_per_min:.0f} req/min")
+        if profile.log_entries:
+            ua = profile.log_entries[-1].user_agent
+            if ua and _has_any_scanner_ua(ua, self.extra_scanner_patterns):
+                reasons.append(f"scanner UA: {ua[:30]}")
+        if self._has_exploit_paths(profile):
+            reasons.append("exploit path detected")
+        if profile.total_auth_failures >= self.suspicious_min_auth_failures:
+            reasons.append(f"{profile.total_auth_failures} auth failures")
+        return reasons
 
     def describe(self) -> str:
         """Short human-readable summary of active filters."""
